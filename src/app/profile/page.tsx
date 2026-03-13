@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+<<<<<<< HEAD
 
+=======
+>>>>>>> c093110 (Member ui stable:dasboard)
 import { auth, db } from "../../lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 
