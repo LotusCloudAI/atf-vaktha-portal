@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-<<<<<<< HEAD
 import { auth, db } from "../../../lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import PerformanceMetrics from "../../../components/analytics/performancemetrics";
@@ -100,53 +99,6 @@ export default function AnalyticsPage() {
           </div>
         )}
       </div>
-=======
-import { db } from "../../../lib/firebase";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
-
-import SpeechProgressChart from "../../../components/analytics/SpeechProgressChart";
-import FillerWordChart from "../../../components/analytics/FillerWordChart";
-import SpeechAnalyticsCard from "../../../components/analytics/SpeechAnalyticsCard";
-import TranscriptViewer from "../../../components/analytics/TranscriptViewer";
-
-export default function AnalyticsPage() {
-  const [speeches, setSpeeches] = useState<any[]>([]);
-
-  useEffect(() => {
-    const fetchSpeeches = async () => {
-      const q = query(
-        collection(db, "speeches"),
-        orderBy("createdAt", "desc")
-      );
-
-      const snapshot = await getDocs(q);
-
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
-      setSpeeches(data);
-    };
-
-    fetchSpeeches();
-  }, []);
-
-  return (
-    <main style={{ padding: "40px" }}>
-      <h1>ATF Vaktha Speech Analytics Dashboard</h1>
-
-      <SpeechProgressChart data={speeches} />
-      <FillerWordChart data={speeches} />
-
-      <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
-        {speeches.map((speech, index) => (
-          <SpeechAnalyticsCard key={index} speech={speech} />
-        ))}
-      </div>
-
-      <TranscriptViewer speeches={speeches} />
->>>>>>> c093110 (Member ui stable:dasboard)
     </main>
   );
 }

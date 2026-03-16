@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { auth, db } from "../../lib/firebase";
-<<<<<<< HEAD
 import {
   collection,
   query,
@@ -12,13 +11,11 @@ import {
 
 interface Speech {
   id: string;
-  title: string;
+  title: string;          
   status: string;
   createdAt?: any;
 }
-=======
-import { collection, query, where, getDocs } from "firebase/firestore";
->>>>>>> c093110 (Member ui stable:dasboard)
+
 
 export default function SpeechesPage() {
   const [speeches, setSpeeches] = useState<Speech[]>([]);
