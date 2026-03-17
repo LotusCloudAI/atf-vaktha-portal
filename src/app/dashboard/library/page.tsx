@@ -1,57 +1,99 @@
-"use client"
+"use client";
 
-import { useEffect,useState } from "react"
-import { auth,db } from "@/lib/firebase"
-import { collection,query,where,getDocs } from "firebase/firestore"
+import { useEffect, useState } from "react";
+import { auth, db } from "@/lib/firebase";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
 
-export default function SpeechLibrary(){
+interface Speech {
+  id: string;
+  title?: string;
+  audioUrl?: string;
+  createdAt?: any;
+}
 
- const [speeches,setSpeeches]=useState([])
+export default function SpeechLibrary() {
+  const [speeches, setSpeeches] = useState<Speech[]>([]);
+  const [loading, setLoading] = useState(true);
 
- useEffect(()=>{
-  const fetchSpeeches=async()=>{
-    const user=auth.currentUser
-    if(!user)return
+  useEffect(() => {
+    const fetchSpeeches = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) {
+          setLoading(false);
+          return;
+        }
 
-    const q=query(
-      collection(db,"speeches"),
-      where("userUid","==",user.uid)
-    )
+        const q = query(
+          collection(db, "speeches"),
+          where("userUid", "==", user.uid)
+        );
 
-    const snapshot=await getDocs(q)
+        const snapshot = await getDocs(q);
 
-    const list=snapshot.docs.map(doc=>({
-      id:doc.id,
-      ...doc.data()
-    }))
+        const list: Speech[] = snapshot.docs.map((doc) => {
+          const data = doc.data() as Omit<Speech, "id">;
 
-    setSpeeches(list)
-  }
+          return {
+            id: doc.id,
+            title: data.title || "Untitled Speech",
+            audioUrl: data.audioUrl || "",
+            createdAt: data.createdAt || null,
+          };
+        });
 
-  fetchSpeeches()
- },[])
+        setSpeeches(list);
+      } catch (error) {
+        console.error("Error fetching speeches:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
- return(
-  <main className="p-10">
+    fetchSpeeches();
+  }, []);
 
-   <h1 className="text-2xl font-bold mb-6">
-    Speech Library
-   </h1>
+  return (
+    <main className="p-10 max-w-4xl mx-auto">
+      <h1 className="text-2xl font-bold mb-6">
+        Speech Library
+      </h1>
 
-   {speeches.map((speech)=>(
-     <div key={speech.id} className="bg-white shadow p-5 mb-4">
+      {/* Loading */}
+      {loading && (
+        <p className="text-gray-500">Loading speeches...</p>
+      )}
 
-        <h3>{speech.title}</h3>
+      {/* Empty */}
+      {!loading && speeches.length === 0 && (
+        <p className="text-gray-500">
+          No speeches available.
+        </p>
+      )}
 
-        {speech.audioUrl && (
-          <audio controls className="mt-3 w-full">
-           <source src={speech.audioUrl}/>
-          </audio>
-        )}
+      {/* List */}
+      {!loading &&
+        speeches.map((speech) => (
+          <div
+            key={speech.id}
+            className="bg-white shadow p-5 mb-4 rounded-lg"
+          >
+            <h3 className="font-semibold text-lg">
+              {speech.title}
+            </h3>
 
-     </div>
-   ))}
-
-  </main>
- )
+            {speech.audioUrl && (
+              <audio controls className="mt-3 w-full">
+                <source src={speech.audioUrl} />
+              </audio>
+            )}
+          </div>
+        ))}
+    </main>
+  );
 }

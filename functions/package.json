@@ -2,13 +2,10 @@
   "name": "functions",
   "description": "Firebase Cloud Functions for ATF Vaktha AI Speech Processing",
   "private": true,
-
   "engines": {
     "node": "20"
   },
-
   "main": "lib/index.js",
-
   "scripts": {
     "lint": "eslint .",
     "build": "tsc",
@@ -19,20 +16,18 @@
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log"
   },
-
   "dependencies": {
     "@google-cloud/speech": "^7.3.0",
     "firebase-admin": "^13.7.0",
-    "firebase-functions": "^7.1.1"
+    "firebase-functions": "^7.2.0"
   },
-
   "devDependencies": {
-    "typescript": "^5.7.3",
+    "@typescript-eslint/eslint-plugin": "^5.62.0",
+    "@typescript-eslint/parser": "^5.62.0",
     "eslint": "^8.57.0",
     "eslint-config-google": "^0.14.0",
     "eslint-plugin-import": "^2.29.0",
-    "@typescript-eslint/eslint-plugin": "^5.62.0",
-    "@typescript-eslint/parser": "^5.62.0",
-    "firebase-functions-test": "^3.4.1"
+    "firebase-functions-test": "^3.4.1",
+    "typescript": "^5.7.3"
   }
 }

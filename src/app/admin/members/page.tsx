@@ -139,7 +139,7 @@ export default function MembersPage() {
             {(userRole === "admin" || userRole === "super_admin") && (
               <div className="flex flex-col gap-2">
                 <Link
-                  href={/admin/members/edit/${m.id}}
+                  href={'/admin/members/edit/${m.id}'}
                   className="text-blue-600 hover:underline"
                 >
                   Edit
