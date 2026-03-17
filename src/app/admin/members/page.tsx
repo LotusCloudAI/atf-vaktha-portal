@@ -78,7 +78,7 @@ export default function MembersPage() {
     }
   };
 
-  // Update Role (from Pavan code - merged safely)
+  // Update Role
   const handleRoleChange = async (memberId: string, newRole: string) => {
     try {
       const memberRef = doc(db, "members", memberId);
@@ -139,4 +139,36 @@ export default function MembersPage() {
             {(userRole === "admin" || userRole === "super_admin") && (
               <div className="flex flex-col gap-2">
                 <Link
-                  href={`/admin/memb
+                  href={/admin/members/edit/${m.id}}
+                  className="text-blue-600 hover:underline"
+                >
+                  Edit
+                </Link>
+
+                <button
+                  className="text-red-600 hover:underline"
+                  onClick={() => handleDelete(m.id)}
+                >
+                  Delete
+                </button>
+
+                <select
+                  value={m.role}
+                  onChange={(e) =>
+                    handleRoleChange(m.id, e.target.value)
+                  }
+                  className="border p-1 text-sm"
+                >
+                  <option value="member">Member</option>
+                  <option value="speaker">Speaker</option>
+                  <option value="admin">Admin</option>
+                  <option value="super_admin">Super Admin</option>
+                </select>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </main>
+  );
+}
