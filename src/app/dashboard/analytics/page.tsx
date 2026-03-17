@@ -1,104 +1,192 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { auth, db } from "../../../lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
-import PerformanceMetrics from "../../../components/analytics/performancemetrics";
+import { onAuthStateChanged } from "firebase/auth";
+import AnalyticsCard from "@/components/dashboard/AnalyticsCard";
 
-interface Transcript {
+interface Speech {
   id: string;
-  text: string;
-  wordCount: number;
-  fillerWords: number;
-  wpm: number;
-  userUid: string;
+  title?: string;
+  status?: string;
+  audioUrl?: string;
+  createdAt?: any;
+
+  speechScore?: number;
+  words?: number;
+  speedWPM?: number;
+  fillerWords?: number;
+  vocabularyScore?: number;
+  transcript?: string;
 }
 
 export default function AnalyticsPage() {
-  const [transcripts, setTranscripts] = useState<Transcript[]>([]);
+
+  const [speeches, setSpeeches] = useState<Speech[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchAnalytics = async () => {
-      const user = auth.currentUser;
-      if (!user) return;
+
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+
+      if (!user) {
+        setSpeeches([]);
+        setLoading(false);
+        return;
+      }
 
       try {
+
         const q = query(
-          collection(db, "transcripts"),
+          collection(db, "speeches"),
           where("userUid", "==", user.uid)
         );
 
         const snapshot = await getDocs(q);
-        const data = snapshot.docs.map(doc => ({
+
+        const data = snapshot.docs.map((doc) => ({
           id: doc.id,
-          ...doc.data()
-        })) as Transcript[];
+          ...doc.data(),
+        })) as Speech[];
 
-        setTranscripts(data);
-      } catch (err) {
-        // Errors are handled silently per Section 8 (no console logs)
+        setSpeeches(data);
+
+      } catch (error) {
+
+        console.error("Error fetching speeches:", error);
+
       } finally {
-        setLoading(false);
-      }
-    };
 
-    fetchAnalytics();
+        setLoading(false);
+
+      }
+
+    });
+
+    return () => unsubscribe();
+
   }, []);
 
   if (loading) {
-    return (
-      <main className="p-4 md:p-10 bg-slate-50 min-h-screen flex items-center justify-center">
-        <p className="text-slate-500 font-medium">Loading Analytics...</p>
-      </main>
-    );
+    return <main className="p-10">Loading...</main>;
   }
 
   return (
-    <main className="p-4 md:p-10 bg-slate-50 min-h-screen">
-      <div className="max-w-7xl mx-auto">
-        <header className="mb-8">
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-            Performance Analytics
-          </h1>
-          <p className="text-slate-500 mt-2 font-medium">
-            Review your communication metrics and filler word usage.
-          </p>
-        </header>
 
-        {/* Responsive Grid: 1 column on mobile, 2 on large screens */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {transcripts.map((item) => (
-            <section 
-              key={item.id} 
-              className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm"
-            >
-              <div className="flex justify-between items-start mb-6">
-                <h2 className="text-lg font-bold text-slate-800">Transcript Details</h2>
-                <span className="text-xs font-semibold px-3 py-1 bg-slate-100 text-slate-600 rounded-full">
-                  ID: {item.id.slice(0, 5)}
-                </span>
-              </div>
-              
-              <blockquote className="border-l-4 border-blue-500 pl-4 py-2 bg-slate-50 rounded-r-lg mb-8 italic text-slate-700 leading-relaxed">
-                "{item.text}"
-              </blockquote>
+    <main className="min-h-screen bg-gray-50 p-10">
 
-              <PerformanceMetrics 
-                wordCount={item.wordCount} 
-                fillerWordCount={item.fillerWords} 
-                wpm={item.wpm} 
-              />
-            </section>
-          ))}
+      <div className="max-w-5xl mx-auto">
+
+        {/* Page Title */}
+        <h1 className="text-3xl font-bold mb-8">
+          Speech Analytics
+        </h1>
+
+        {/* Summary Card */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+          <AnalyticsCard
+            title="Total Speeches"
+            value={speeches.length}
+          />
         </div>
 
-        {transcripts.length === 0 && (
-          <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300">
-            <p className="text-slate-500">No transcripts available yet.</p>
-          </div>
+        {/* Speech List */}
+        {speeches.length === 0 ? (
+
+          <p className="text-gray-600">
+            No speeches found.
+          </p>
+
+        ) : (
+
+          speeches.map((speech) => (
+
+            <div
+              key={speech.id}
+              className="bg-white shadow rounded p-6 mb-6"
+            >
+
+              {/* Title */}
+              <h3 className="text-lg font-semibold text-gray-800">
+                {speech.title}
+              </h3>
+
+              {/* Audio Player */}
+              {speech.audioUrl && (
+                <audio controls className="mt-4 w-full">
+                  <source src={speech.audioUrl} />
+                </audio>
+              )}
+
+              {/* Upload Date */}
+              {speech.createdAt && (
+                <p className="text-sm text-gray-500 mt-3">
+                  Uploaded: {speech.createdAt?.toDate?.().toLocaleString?.()}
+                </p>
+              )}
+
+              {/* Status */}
+              {speech.status && (
+                <p className="text-sm text-gray-600 mt-1">
+                  Status: {speech.status}
+                </p>
+              )}
+
+              {/* Analytics Section */}
+              {speech.speechScore !== undefined && (
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
+
+                  <div className="bg-gray-100 p-4 rounded text-center">
+                    <p className="text-xs text-gray-500">Speech Score</p>
+                    <p className="text-lg font-bold">{speech.speechScore}</p>
+                  </div>
+
+                  <div className="bg-gray-100 p-4 rounded text-center">
+                    <p className="text-xs text-gray-500">Words</p>
+                    <p className="text-lg font-bold">{speech.words}</p>
+                  </div>
+
+                  <div className="bg-gray-100 p-4 rounded text-center">
+                    <p className="text-xs text-gray-500">Speed</p>
+                    <p className="text-lg font-bold">{speech.speedWPM} WPM</p>
+                  </div>
+
+                  <div className="bg-gray-100 p-4 rounded text-center">
+                    <p className="text-xs text-gray-500">Filler Words</p>
+                    <p className="text-lg font-bold">{speech.fillerWords}</p>
+                  </div>
+
+                  <div className="bg-gray-100 p-4 rounded text-center">
+                    <p className="text-xs text-gray-500">Vocabulary</p>
+                    <p className="text-lg font-bold">{speech.vocabularyScore}</p>
+                  </div>
+
+                </div>
+              )}
+
+              {/* Transcript */}
+              {speech.transcript && (
+                <div className="bg-gray-50 p-4 rounded mt-6">
+                  <h4 className="font-semibold mb-2">
+                    Speech Transcript
+                  </h4>
+                  <p className="text-sm text-gray-700">
+                    {speech.transcript}
+                  </p>
+                </div>
+              )}
+
+            </div>
+
+          ))
+
         )}
+
       </div>
+
     </main>
+
   );
+
 }

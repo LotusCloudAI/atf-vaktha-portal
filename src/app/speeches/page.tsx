@@ -6,18 +6,18 @@ import {
   collection,
   query,
   where,
-  getDocs,
+  getDocs
 } from "firebase/firestore";
 
 interface Speech {
   id: string;
-  title: string;          
-  status: string;
+  title?: string;
+  status?: string;
   createdAt?: any;
 }
 
-
 export default function SpeechesPage() {
+
   const [speeches, setSpeeches] = useState<Speech[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +34,7 @@ export default function SpeechesPage() {
 
         const q = query(
           collection(db, "speeches"),
-          where("userId", "==", user.uid)
+          where("userUid", "==", user.uid)
         );
 
         const snapshot = await getDocs(q);
@@ -45,6 +45,7 @@ export default function SpeechesPage() {
         }));
 
         setSpeeches(speechData);
+
       } catch (err) {
         console.error("Error fetching speeches:", err);
         setError("Failed to load speeches.");
@@ -58,31 +59,50 @@ export default function SpeechesPage() {
 
   return (
     <main className="p-10 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">My Speeches</h1>
 
-      {loading && <p>Loading speeches...</p>}
+      <h1 className="text-2xl font-bold mb-6">
+        My Speeches
+      </h1>
 
-      {error && <p className="text-red-600">{error}</p>}
+      {/* Loading */}
+      {loading && (
+        <p className="text-gray-500">Loading speeches...</p>
+      )}
 
+      {/* Error */}
+      {error && (
+        <p className="text-red-600">{error}</p>
+      )}
+
+      {/* Empty State */}
       {!loading && speeches.length === 0 && (
         <p className="text-gray-500">
           No speeches found. Upload your first speech to get started.
         </p>
       )}
 
+      {/* Speech List */}
       {speeches.map((speech) => (
         <div
           key={speech.id}
-          className="border rounded-lg p-4 mb-4 shadow-sm"
+          className="border rounded-lg p-5 mb-4 shadow-sm bg-white"
         >
           <h2 className="font-semibold text-lg">
             {speech.title || "Untitled Speech"}
           </h2>
-          <p className="text-sm text-gray-600">
+
+          <p className="text-sm text-gray-600 mt-1">
             Status: {speech.status || "Pending"}
           </p>
+
+          {speech.createdAt && (
+            <p className="text-xs text-gray-400 mt-1">
+              Uploaded: {speech.createdAt?.toDate?.().toLocaleString?.()}
+            </p>
+          )}
         </div>
       ))}
+
     </main>
   );
 }
