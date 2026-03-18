@@ -1,147 +1,97 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { auth, db } from "../../lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { useRouter } from "next/navigation";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  deleteDoc,
-  doc
-} from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
 
-export default function UploadSpeechPage() {
-  const [user, setUser] = useState<any>(null);
-  const [checking, setChecking] = useState(true);
+export default function DashboardPage() {
+  const [speechCount, setSpeechCount] = useState(0);
+  const [recentSpeeches, setRecentSpeeches] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [title, setTitle] = useState("");
-  const [audioUrl, setAudioUrl] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const router = useRouter();
-
-  // ✅ Auth check
   useEffect(() => {
+    const fetchData = async () => {
+      // Get the currently logged-in user
+      const user = auth.currentUser;
 
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-
-      if (!firebaseUser) {
-        router.replace("/");
+      if (!user) {
+        setLoading(false);
         return;
       }
 
-      setUser(firebaseUser);
-
       try {
-
+        // Build query: Filter by current user's UID
         const q = query(
           collection(db, "speeches"),
-          where("userUid", "==", firebaseUser.uid)
+          where("userUid", "==", user.uid)
         );
 
         const snapshot = await getDocs(q);
 
-        const speechList = snapshot.docs.map((docItem) => ({
-          id: docItem.id,
-          ...docItem.data(),
+        const speeches = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
         }));
 
-        setSpeeches(speechList);
-
+        setSpeechCount(snapshot.size);
+        // Sort and slice for the last 5 (Note: usually done in query with orderBy)
+        setRecentSpeeches(speeches.slice(0, 5));
       } catch (error) {
-        console.error("Error loading speeches:", error);
+        console.error("Error fetching dashboard data:", error);
+      } finally {
+        setLoading(false);
       }
+    };
 
-      setChecking(false);
-
-    });
-
-    return () => unsubscribe();
-
-  }, [router]);
-
-  // ✅ Submit function
-  const handleSubmit = async () => {
-    if (!title || !audioUrl) {
-      alert("Please fill all fields");
-      return;
-    }
-
-    if (!user) {
-      alert("User not authenticated");
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      await addDoc(collection(db, "speeches"), {
-        title,
-        audioUrl,
-        userUid: user.uid,
-        userName: user.displayName || "",
-        createdAt: serverTimestamp(),
-      });
-
-      alert("Speech uploaded successfully!");
-
-      // Reset
-      setTitle("");
-      setAudioUrl("");
-
-      // Optional: redirect to library
-      router.push("/dashboard/library");
-    } catch (error) {
-      console.error(error);
-      alert("Error uploading speech");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (checking) return <div className="p-10">Loading...</div>;
+    fetchData();
+  }, []);
 
   return (
+    <main className="p-6 max-w-4xl mx-auto">
+      <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
 
-    <main className="min-h-screen bg-gray-50 p-10">
-      <h1 className="text-3xl font-bold text-blue-700 mb-6">
-        Upload Speech
-      </h1>
+      {loading && <p className="animate-pulse text-gray-500">Loading your data...</p>}
 
-      <p className="mb-6 text-gray-700">
-        Welcome, {user?.displayName}
-      </p>
+      {!loading && (
+        <>
+          {/* Summary Card */}
+          <div className="bg-white shadow-md border border-gray-100 rounded-xl p-6 mb-8">
+            <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wider">
+              Total Speeches
+            </h2>
+            <p className="text-4xl font-bold text-blue-600">{speechCount}</p>
+          </div>
 
-      <div className="bg-white shadow rounded-lg p-6 max-w-xl">
-        <input
-          type="text"
-          placeholder="Enter speech title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="border p-3 w-full mb-4 rounded"
-        />
+          {/* Recent Speeches List */}
+          <div>
+            <h2 className="text-xl font-semibold mb-4 text-gray-800">
+              Recent Speeches
+            </h2>
 
-        <input
-          type="text"
-          placeholder="Paste audio URL (MP3)"
-          value={audioUrl}
-          onChange={(e) => setAudioUrl(e.target.value)}
-          className="border p-3 w-full mb-4 rounded"
-        />
-
-        <button
-          onClick={handleSubmit}
-          disabled={loading}
-          className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
-        >
-          {loading ? "Uploading..." : "Submit"}
-        </button>
-      </div>
+            {recentSpeeches.length === 0 ? (
+              <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-10 text-center">
+                <p className="text-gray-500">No speeches found. Start by creating one!</p>
+              </div>
+            ) : (
+              recentSpeeches.map((speech) => (
+                <div
+                  key={speech.id}
+                  className="bg-white shadow-sm border border-gray-100 rounded-xl p-4 mb-4 hover:shadow-md transition-shadow"
+                >
+                  <h3 className="text-md font-semibold text-gray-700">
+                    {speech.title || "Untitled Speech"}
+                  </h3>
+                  {speech.createdAt && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      {new Date(speech.createdAt?.seconds * 1000).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
     </main>
-
   );
 }
