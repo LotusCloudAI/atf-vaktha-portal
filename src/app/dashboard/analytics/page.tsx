@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-<<<<<<< HEAD
 import { auth, db } from "../../../lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import PerformanceMetrics from "../../../components/analytics/performancemetrics";
 
@@ -20,9 +20,11 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchAnalytics = async () => {
-      const user = auth.currentUser;
-      if (!user) return;
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
       try {
         const q = query(
@@ -31,20 +33,21 @@ export default function AnalyticsPage() {
         );
 
         const snapshot = await getDocs(q);
-        const data = snapshot.docs.map(doc => ({
+
+        const data = snapshot.docs.map((doc) => ({
           id: doc.id,
-          ...doc.data()
+          ...doc.data(),
         })) as Transcript[];
 
         setTranscripts(data);
-      } catch (err) {
-        // Errors are handled silently per Section 8 (no console logs)
+      } catch (error) {
+        console.error("Error fetching analytics:", error);
       } finally {
         setLoading(false);
       }
-    };
+    });
 
-    fetchAnalytics();
+    return () => unsubscribe();
   }, []);
 
   if (loading) {
@@ -67,86 +70,40 @@ export default function AnalyticsPage() {
           </p>
         </header>
 
-        {/* Responsive Grid: 1 column on mobile, 2 on large screens */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {transcripts.map((item) => (
-            <section 
-              key={item.id} 
-              className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm"
-            >
-              <div className="flex justify-between items-start mb-6">
-                <h2 className="text-lg font-bold text-slate-800">Transcript Details</h2>
-                <span className="text-xs font-semibold px-3 py-1 bg-slate-100 text-slate-600 rounded-full">
-                  ID: {item.id.slice(0, 5)}
-                </span>
-              </div>
-              
-              <blockquote className="border-l-4 border-blue-500 pl-4 py-2 bg-slate-50 rounded-r-lg mb-8 italic text-slate-700 leading-relaxed">
-                "{item.text}"
-              </blockquote>
-
-              <PerformanceMetrics 
-                wordCount={item.wordCount} 
-                fillerWordCount={item.fillerWords} 
-                wpm={item.wpm} 
-              />
-            </section>
-          ))}
-        </div>
-
-        {transcripts.length === 0 && (
+        {transcripts.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300">
             <p className="text-slate-500">No transcripts available yet.</p>
           </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {transcripts.map((item) => (
+              <section
+                key={item.id}
+                className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm"
+              >
+                <div className="flex justify-between items-start mb-6">
+                  <h2 className="text-lg font-bold text-slate-800">
+                    Transcript Details
+                  </h2>
+                  <span className="text-xs font-semibold px-3 py-1 bg-slate-100 text-slate-600 rounded-full">
+                    ID: {item.id.slice(0, 5)}
+                  </span>
+                </div>
+
+                <blockquote className="border-l-4 border-blue-500 pl-4 py-2 bg-slate-50 rounded-r-lg mb-8 italic text-slate-700 leading-relaxed">
+                  "{item.text}"
+                </blockquote>
+
+                <PerformanceMetrics
+                  wordCount={item.wordCount}
+                  fillerWordCount={item.fillerWords}
+                  wpm={item.wpm}
+                />
+              </section>
+            ))}
+          </div>
         )}
       </div>
-=======
-import { db } from "../../../lib/firebase";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
-
-import SpeechProgressChart from "../../../components/analytics/SpeechProgressChart";
-import FillerWordChart from "../../../components/analytics/FillerWordChart";
-import SpeechAnalyticsCard from "../../../components/analytics/SpeechAnalyticsCard";
-import TranscriptViewer from "../../../components/analytics/TranscriptViewer";
-
-export default function AnalyticsPage() {
-  const [speeches, setSpeeches] = useState<any[]>([]);
-
-  useEffect(() => {
-    const fetchSpeeches = async () => {
-      const q = query(
-        collection(db, "speeches"),
-        orderBy("createdAt", "desc")
-      );
-
-      const snapshot = await getDocs(q);
-
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
-      setSpeeches(data);
-    };
-
-    fetchSpeeches();
-  }, []);
-
-  return (
-    <main style={{ padding: "40px" }}>
-      <h1>ATF Vaktha Speech Analytics Dashboard</h1>
-
-      <SpeechProgressChart data={speeches} />
-      <FillerWordChart data={speeches} />
-
-      <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
-        {speeches.map((speech, index) => (
-          <SpeechAnalyticsCard key={index} speech={speech} />
-        ))}
-      </div>
-
-      <TranscriptViewer speeches={speeches} />
->>>>>>> c093110 (Member ui stable:dasboard)
     </main>
   );
 }

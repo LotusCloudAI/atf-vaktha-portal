@@ -1,47 +1,80 @@
 "use client";
 
 import { useState } from "react";
-import { auth, db } from "@/lib/firebase";
-import { addDoc, collection } from "firebase/firestore";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { auth, db } from "../../../lib/firebase";
+import { collection, addDoc } from "firebase/firestore";
 
-export default function UploadSpeech() {
-  const [file, setFile] = useState<File | null>(null);
+export default function UploadSpeechPage() {
+  const [title, setTitle] = useState("");
+  const [audioUrl, setAudioUrl] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
 
   const handleUpload = async () => {
-    if (!file) return;
-
     const user = auth.currentUser;
-    if (!user) return;
 
-    const storage = getStorage();
-    const storageRef = ref(storage, `speeches/${user.uid}/${file.name}`);
+    if (!user) {
+      setMessage("User not logged in");
+      return;
+    }
 
-    await uploadBytes(storageRef, file);
-    const url = await getDownloadURL(storageRef);
+    if (!title || !audioUrl) {
+      setMessage("Please fill all fields");
+      return;
+    }
 
-    await addDoc(collection(db, "speeches"), {
-      userUid: user.uid,
-      title: file.name,
-      status: "uploaded",
-      audioUrl: url,
-      createdAt: new Date(),
-    });
+    try {
+      setLoading(true);
+
+      await addDoc(collection(db, "speeches"), {
+        title,
+        audioUrl,
+        userUid: user.uid,
+        createdAt: new Date(),
+      });
+
+      setMessage("Speech uploaded successfully");
+      setTitle("");
+      setAudioUrl("");
+    } catch (error) {
+      console.error(error);
+      setMessage("Error uploading speech");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <main className="p-10">
-      <input
-        type="file"
-        accept="audio/*"
-        onChange={(e) => setFile(e.target.files?.[0] || null)}
-      />
-      <button
-        onClick={handleUpload}
-        className="mt-4 px-4 py-2 bg-green-600 text-white"
-      >
-        Upload
-      </button>
+    <main className="p-6">
+      <div className="bg-white shadow-md rounded-xl p-6 max-w-xl mx-auto">
+        <h1 className="text-xl font-bold mb-4">Upload Speech</h1>
+
+        <input
+          className="w-full border border-gray-300 rounded-lg p-2 mb-4"
+          placeholder="Enter Title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+
+        <input
+          className="w-full border border-gray-300 rounded-lg p-2 mb-4"
+          placeholder="Enter Audio URL"
+          value={audioUrl}
+          onChange={(e) => setAudioUrl(e.target.value)}
+        />
+
+        <button
+          onClick={handleUpload}
+          disabled={loading}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg w-full"
+        >
+          {loading ? "Uploading..." : "Upload"}
+        </button>
+
+        {message && (
+          <p className="text-green-600 mt-3">{message}</p>
+        )}
+      </div>
     </main>
   );
 }
