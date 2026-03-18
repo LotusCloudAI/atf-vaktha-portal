@@ -1,34 +1,41 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { auth, db } from "../../../lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, getDocs } from "firebase/firestore";
-import PerformanceMetrics from "../../../components/analytics/performancemetrics";
+import AnalyticsCard from "@/components/dashboard/AnalyticsCard";
 
-interface Transcript {
+interface Speech {
   id: string;
-  text: string;
-  wordCount: number;
-  fillerWords: number;
-  wpm: number;
-  userUid: string;
+  title?: string;
+  status?: string;
+  audioUrl?: string;
+  createdAt?: any;
+
+  speechScore?: number;
+  words?: number;
+  speedWPM?: number;
+  fillerWords?: number;
+  vocabularyScore?: number;
+  transcript?: string;
 }
 
 export default function AnalyticsPage() {
-  const [transcripts, setTranscripts] = useState<Transcript[]>([]);
+  const [speeches, setSpeeches] = useState<Speech[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
+        setSpeeches([]);
         setLoading(false);
         return;
       }
 
       try {
         const q = query(
-          collection(db, "transcripts"),
+          collection(db, "speeches"),
           where("userUid", "==", user.uid)
         );
 
@@ -37,11 +44,11 @@ export default function AnalyticsPage() {
         const data = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
-        })) as Transcript[];
+        })) as Speech[];
 
-        setTranscripts(data);
+        setSpeeches(data);
       } catch (error) {
-        console.error("Error fetching analytics:", error);
+        console.error("Error fetching speeches:", error);
       } finally {
         setLoading(false);
       }
@@ -51,58 +58,57 @@ export default function AnalyticsPage() {
   }, []);
 
   if (loading) {
-    return (
-      <main className="p-4 md:p-10 bg-slate-50 min-h-screen flex items-center justify-center">
-        <p className="text-slate-500 font-medium">Loading Analytics...</p>
-      </main>
-    );
+    return <main className="p-10">Loading...</main>;
   }
 
   return (
-    <main className="p-4 md:p-10 bg-slate-50 min-h-screen">
-      <div className="max-w-7xl mx-auto">
-        <header className="mb-8">
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-            Performance Analytics
-          </h1>
-          <p className="text-slate-500 mt-2 font-medium">
-            Review your communication metrics and filler word usage.
+    <main className="min-h-screen bg-gray-50 p-10">
+      <div className="max-w-5xl mx-auto">
+
+        {/* Page Title */}
+        <h1 className="text-3xl font-bold mb-8">
+          Speech Analytics
+        </h1>
+
+        {/* Summary */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+          <AnalyticsCard
+            title="Total Speeches"
+            value={speeches.length}
+          />
+        </div>
+
+        {/* Speech List */}
+        {speeches.length === 0 ? (
+          <p className="text-gray-600">
+            No speeches available.
           </p>
-        </header>
-
-        {transcripts.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300">
-            <p className="text-slate-500">No transcripts available yet.</p>
-          </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {transcripts.map((item) => (
-              <section
-                key={item.id}
-                className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm"
+          <div className="space-y-6">
+            {speeches.map((speech) => (
+              <div
+                key={speech.id}
+                className="bg-white p-6 rounded-xl shadow border"
               >
-                <div className="flex justify-between items-start mb-6">
-                  <h2 className="text-lg font-bold text-slate-800">
-                    Transcript Details
-                  </h2>
-                  <span className="text-xs font-semibold px-3 py-1 bg-slate-100 text-slate-600 rounded-full">
-                    ID: {item.id.slice(0, 5)}
-                  </span>
+                <h2 className="text-lg font-semibold mb-2">
+                  {speech.title || "Untitled Speech"}
+                </h2>
+
+                <p className="text-sm text-gray-500 mb-4">
+                  ID: {speech.id.slice(0, 6)}
+                </p>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <AnalyticsCard title="Words" value={speech.words || 0} />
+                  <AnalyticsCard title="WPM" value={speech.speedWPM || 0} />
+                  <AnalyticsCard title="Filler Words" value={speech.fillerWords || 0} />
+                  <AnalyticsCard title="Score" value={speech.speechScore || 0} />
                 </div>
-
-                <blockquote className="border-l-4 border-blue-500 pl-4 py-2 bg-slate-50 rounded-r-lg mb-8 italic text-slate-700 leading-relaxed">
-                  "{item.text}"
-                </blockquote>
-
-                <PerformanceMetrics
-                  wordCount={item.wordCount}
-                  fillerWordCount={item.fillerWords}
-                  wpm={item.wpm}
-                />
-              </section>
+              </div>
             ))}
           </div>
         )}
+
       </div>
     </main>
   );
