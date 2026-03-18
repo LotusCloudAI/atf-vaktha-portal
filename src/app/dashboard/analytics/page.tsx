@@ -41,12 +41,26 @@ export default function AnalyticsPage() {
 
         const snapshot = await getDocs(q);
 
-        const data = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Speech[];
+        const data: Speech[] = snapshot.docs.map((doc) => {
+          const d = doc.data();
+
+          return {
+            id: doc.id,
+            title: d.title || "Untitled Speech",
+            status: d.status || "",
+            audioUrl: d.audioUrl || "",
+            createdAt: d.createdAt || null,
+            speechScore: d.speechScore || 0,
+            words: d.words || 0,
+            speedWPM: d.speedWPM || 0,
+            fillerWords: d.fillerWords || 0,
+            vocabularyScore: d.vocabularyScore || 0,
+            transcript: d.transcript || "",
+          };
+        });
 
         setSpeeches(data);
+
       } catch (error) {
         console.error("Error fetching speeches:", error);
       } finally {
@@ -65,7 +79,7 @@ export default function AnalyticsPage() {
     <main className="min-h-screen bg-gray-50 p-10">
       <div className="max-w-5xl mx-auto">
 
-        {/* Page Title */}
+        {/* Title */}
         <h1 className="text-3xl font-bold mb-8">
           Speech Analytics
         </h1>
@@ -78,7 +92,7 @@ export default function AnalyticsPage() {
           />
         </div>
 
-        {/* Speech List */}
+        {/* List */}
         {speeches.length === 0 ? (
           <p className="text-gray-600">
             No speeches available.
@@ -91,7 +105,7 @@ export default function AnalyticsPage() {
                 className="bg-white p-6 rounded-xl shadow border"
               >
                 <h2 className="text-lg font-semibold mb-2">
-                  {speech.title || "Untitled Speech"}
+                  {speech.title}
                 </h2>
 
                 <p className="text-sm text-gray-500 mb-4">
@@ -99,10 +113,10 @@ export default function AnalyticsPage() {
                 </p>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <AnalyticsCard title="Words" value={speech.words || 0} />
-                  <AnalyticsCard title="WPM" value={speech.speedWPM || 0} />
-                  <AnalyticsCard title="Filler Words" value={speech.fillerWords || 0} />
-                  <AnalyticsCard title="Score" value={speech.speechScore || 0} />
+                  <AnalyticsCard title="Words" value={speech.words ?? 0} />
+                  <AnalyticsCard title="WPM" value={speech.speedWPM ?? 0} />
+                  <AnalyticsCard title="Filler Words" value={speech.fillerWords ?? 0} />
+                  <AnalyticsCard title="Score" value={speech.speechScore ?? 0} />
                 </div>
               </div>
             ))}
