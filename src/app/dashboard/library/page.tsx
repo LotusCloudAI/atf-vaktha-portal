@@ -2,6 +2,13 @@
 
 import { useEffect, useState } from "react";
 <<<<<<< HEAD
+import { auth, db } from "../../../lib/firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
+
+export default function LibraryPage() {
+  const [speeches, setSpeeches] = useState<any[]>([]);
+=======
+<<<<<<< HEAD
 import { auth, db } from "@/lib/firebase";
 import {
   collection,
@@ -19,10 +26,18 @@ interface Speech {
 
 export default function SpeechLibrary() {
   const [speeches, setSpeeches] = useState<Speech[]>([]);
+>>>>>>> main
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchSpeeches = async () => {
+<<<<<<< HEAD
+      const user = auth.currentUser;
+
+      if (!user) return;
+
+      try {
+=======
       try {
         const user = auth.currentUser;
         if (!user) {
@@ -30,6 +45,7 @@ export default function SpeechLibrary() {
           return;
         }
 
+>>>>>>> main
         const q = query(
           collection(db, "speeches"),
           where("userUid", "==", user.uid)
@@ -37,6 +53,19 @@ export default function SpeechLibrary() {
 
         const snapshot = await getDocs(q);
 
+<<<<<<< HEAD
+        const data = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+
+        setSpeeches(data);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+=======
         const list: Speech[] = snapshot.docs.map((doc) => {
           const data = doc.data() as Omit<Speech, "id">;
 
@@ -80,12 +109,33 @@ export default function SpeechLibrary() {
 
       setSpeeches(list);
 >>>>>>> feature/admin-layer
+>>>>>>> main
     };
 
     fetchSpeeches();
   }, []);
 
   return (
+<<<<<<< HEAD
+    <main className="p-6 max-w-4xl mx-auto">
+      <h1 className="text-2xl font-bold mb-6">My Speeches</h1>
+
+      {loading && <p>Loading...</p>}
+
+      {!loading && speeches.length === 0 && (
+        <p>No speeches found</p>
+      )}
+
+      {speeches.map((speech) => (
+        <div key={speech.id} className="bg-white shadow-md rounded-xl p-4 mb-4">
+          <h2 className="text-lg font-semibold">{speech.title}</h2>
+
+          <audio controls className="w-full mt-2">
+            <source src={speech.audioUrl} />
+          </audio>
+        </div>
+      ))}
+=======
 <<<<<<< HEAD
     <main className="p-10 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-6">
@@ -142,6 +192,7 @@ export default function SpeechLibrary() {
         </div>
       ))}
 >>>>>>> feature/admin-layer
+>>>>>>> main
     </main>
   );
 }
