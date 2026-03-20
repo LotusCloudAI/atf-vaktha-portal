@@ -6,17 +6,16 @@ import { useRouter } from "next/navigation";
 import {
   addDoc,
   collection,
-  serverTimestamp
+  serverTimestamp,
 } from "firebase/firestore";
 import {
   getStorage,
   ref,
   uploadBytes,
-  getDownloadURL
+  getDownloadURL,
 } from "firebase/storage";
 
 export default function UploadSpeech() {
-
   const router = useRouter();
 
   const [title, setTitle] = useState("");
@@ -24,8 +23,7 @@ export default function UploadSpeech() {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  const handleUpload = async (e: any) => {
-
+  const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const user = auth.currentUser;
@@ -35,7 +33,7 @@ export default function UploadSpeech() {
       return;
     }
 
-    if (!title) {
+    if (!title.trim()) {
       alert("Please enter speech title");
       return;
     }
@@ -43,11 +41,9 @@ export default function UploadSpeech() {
     setUploading(true);
 
     try {
-
       let audioUrl = "";
 
       if (file) {
-
         const storage = getStorage();
 
         const storageRef = ref(
@@ -56,35 +52,28 @@ export default function UploadSpeech() {
         );
 
         await uploadBytes(storageRef, file);
-
         audioUrl = await getDownloadURL(storageRef);
-
       }
 
       await addDoc(collection(db, "speeches"), {
-        title: title,
-        content: content,
-        audioUrl: audioUrl,
+        title,
+        content,
+        audioUrl,
         userUid: user.uid,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
       });
 
       router.push("/dashboard");
-
     } catch (error) {
-
       console.error("Upload failed:", error);
-
+      alert("Upload failed");
+    } finally {
+      setUploading(false);
     }
-
-    setUploading(false);
-
   };
 
   return (
-
     <main className="min-h-screen bg-gray-50 p-10">
-
       <h1 className="text-3xl font-bold text-blue-700">
         Upload New Speech
       </h1>
@@ -93,7 +82,6 @@ export default function UploadSpeech() {
         onSubmit={handleUpload}
         className="mt-8 max-w-xl space-y-4"
       >
-
         <input
           type="text"
           placeholder="Speech Title"
@@ -113,7 +101,9 @@ export default function UploadSpeech() {
         <input
           type="file"
           accept="audio/*"
-          onChange={(e) => setFile(e.target.files?.[0] || null)}
+          onChange={(e) =>
+            setFile(e.target.files?.[0] || null)
+          }
           className="w-full"
         />
 
@@ -124,11 +114,7 @@ export default function UploadSpeech() {
         >
           {uploading ? "Uploading..." : "Upload Speech"}
         </button>
-
       </form>
-
     </main>
-
   );
-
 }

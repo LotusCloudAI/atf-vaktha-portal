@@ -16,6 +16,19 @@ export default function DashboardPage() {
 
       if (!user) {
         setLoading(false);
+
+import { onAuthStateChanged } from "firebase/auth";
+import { collection, query, where, getDocs } from "firebase/firestore";
+
+export default function DashboardPage() {
+
+  const [speeches, setSpeeches] = useState<any[]>([]);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setChecking(false);
         return;
       }
 
@@ -28,7 +41,10 @@ export default function DashboardPage() {
 
         const snapshot = await getDocs(q);
 
+
         const speeches = snapshot.docs.map((doc) => ({
+
+        const speechList = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
@@ -42,6 +58,7 @@ export default function DashboardPage() {
         setLoading(false);
       }
     };
+
 
     fetchData();
   }, []);
@@ -92,6 +109,22 @@ export default function DashboardPage() {
           </div>
         </>
       )}
+
+      setChecking(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  if (checking) {
+    return <div className="p-10">Loading...</div>;
+  }
+
+  return (
+    <main className="p-10">
+      <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
+
+      <p>Total Speeches: {speeches.length}</p>
     </main>
   );
 }
