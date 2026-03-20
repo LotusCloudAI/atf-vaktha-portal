@@ -1,3 +1,4 @@
+import "./globals.css";
 export const metadata = {
   title: "ATF Vaktha Portal",
   description: "Leadership • Communication • Confidence",

@@ -60,7 +60,6 @@ export default function AnalyticsPage() {
         });
 
         setSpeeches(data);
-
       } catch (error) {
         console.error("Error fetching speeches:", error);
       } finally {
@@ -71,20 +70,25 @@ export default function AnalyticsPage() {
     return () => unsubscribe();
   }, []);
 
+  // ✅ Loading UI
   if (loading) {
-    return <main className="p-10">Loading...</main>;
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-gray-600 text-lg">Loading analytics...</p>
+      </main>
+    );
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 p-10">
-      <div className="max-w-5xl mx-auto">
+    <main className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-6xl mx-auto">
 
-        {/* Title */}
-        <h1 className="text-3xl font-bold mb-8">
-          Speech Analytics
+        {/* 🔥 Title */}
+        <h1 className="text-3xl font-bold text-atfBlue mb-8">
+          ATF Vaktha Analytics
         </h1>
 
-        {/* Summary */}
+        {/* 📊 Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           <AnalyticsCard
             title="Total Speeches"
@@ -92,37 +96,58 @@ export default function AnalyticsPage() {
           />
         </div>
 
-        {/* List */}
+        {/* 📭 Empty State */}
         {speeches.length === 0 ? (
-          <p className="text-gray-600">
-            No speeches available.
-          </p>
+          <div className="bg-white p-8 rounded-xl shadow text-center">
+            <p className="text-gray-600 text-lg">
+              No speeches available yet.
+            </p>
+          </div>
         ) : (
-          <div className="space-y-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {speeches.map((speech) => (
               <div
                 key={speech.id}
-                className="bg-white p-6 rounded-xl shadow border"
+                className="bg-white p-6 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition"
               >
-                <h2 className="text-lg font-semibold mb-2">
+                {/* 🎤 Title */}
+                <h2 className="text-lg font-semibold text-gray-800 mb-2">
                   {speech.title}
                 </h2>
 
-                <p className="text-sm text-gray-500 mb-4">
+                {/* 🆔 ID */}
+                <p className="text-xs text-gray-500 mb-4">
                   ID: {speech.id.slice(0, 6)}
                 </p>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <AnalyticsCard title="Words" value={speech.words ?? 0} />
-                  <AnalyticsCard title="WPM" value={speech.speedWPM ?? 0} />
-                  <AnalyticsCard title="Filler Words" value={speech.fillerWords ?? 0} />
-                  <AnalyticsCard title="Score" value={speech.speechScore ?? 0} />
+                {/* 📈 Metrics */}
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-500">Words</p>
+                    <p className="font-semibold">{speech.words ?? 0}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-gray-500">WPM</p>
+                    <p className="font-semibold">{speech.speedWPM ?? 0}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-gray-500">Filler Words</p>
+                    <p className="font-semibold">{speech.fillerWords ?? 0}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-gray-500">Score</p>
+                    <p className="font-semibold text-green-600">
+                      {speech.speechScore ?? 0}
+                    </p>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         )}
-
       </div>
     </main>
   );
