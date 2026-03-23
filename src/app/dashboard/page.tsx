@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
-import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
+import { collection, query, where, getDocs } from "firebase/firestore";
 
 export default function DashboardPage() {
   const [speechCount, setSpeechCount] = useState(0);
@@ -10,30 +11,15 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
-      // Get the currently logged-in user
-      const user = auth.currentUser;
+    let isMounted = true;
 
-      if (!user) {
-        setLoading(false);
-
-import { onAuthStateChanged } from "firebase/auth";
-import { collection, query, where, getDocs } from "firebase/firestore";
-
-export default function DashboardPage() {
-
-  const [speeches, setSpeeches] = useState<any[]>([]);
-  const [checking, setChecking] = useState(true);
-
-  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        setChecking(false);
+        if (isMounted) setLoading(false);
         return;
       }
 
       try {
-        // Build query: Filter by current user's UID
         const q = query(
           collection(db, "speeches"),
           where("userUid", "==", user.uid)
@@ -41,45 +27,58 @@ export default function DashboardPage() {
 
         const snapshot = await getDocs(q);
 
-
-        const speeches = snapshot.docs.map((doc) => ({
-
-        const speechList = snapshot.docs.map((doc) => ({
+        let speechList = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
 
-        setSpeechCount(snapshot.size);
-        // Sort and slice for the last 5 (Note: usually done in query with orderBy)
-        setRecentSpeeches(speeches.slice(0, 5));
+        // Sort latest first (safe optional chaining)
+        speechList.sort((a: any, b: any) => {
+          return (b?.createdAt?.seconds || 0) - (a?.createdAt?.seconds || 0);
+        });
+
+        if (isMounted) {
+          setSpeechCount(snapshot.size);
+          setRecentSpeeches(speechList.slice(0, 5));
+        }
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
     };
-
-
-    fetchData();
   }, []);
 
   return (
     <main className="p-6 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
 
-      {loading && <p className="animate-pulse text-gray-500">Loading your data...</p>}
+      {/* Loading */}
+      {loading && (
+        <p className="text-gray-500 animate-pulse">
+          Loading dashboard...
+        </p>
+      )}
 
+      {/* Content */}
       {!loading && (
         <>
-          {/* Summary Card */}
+          {/* Summary */}
           <div className="bg-white shadow-md border border-gray-100 rounded-xl p-6 mb-8">
             <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wider">
               Total Speeches
             </h2>
-            <p className="text-4xl font-bold text-blue-600">{speechCount}</p>
+            <p className="text-4xl font-bold text-blue-600">
+              {speechCount}
+            </p>
           </div>
 
-          {/* Recent Speeches List */}
+          {/* Recent Speeches */}
           <div>
             <h2 className="text-xl font-semibold mb-4 text-gray-800">
               Recent Speeches
@@ -87,7 +86,9 @@ export default function DashboardPage() {
 
             {recentSpeeches.length === 0 ? (
               <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-10 text-center">
-                <p className="text-gray-500">No speeches found. Start by creating one!</p>
+                <p className="text-gray-500">
+                  No speeches found. Start by creating one!
+                </p>
               </div>
             ) : (
               recentSpeeches.map((speech) => (
@@ -98,9 +99,12 @@ export default function DashboardPage() {
                   <h3 className="text-md font-semibold text-gray-700">
                     {speech.title || "Untitled Speech"}
                   </h3>
-                  {speech.createdAt && (
+
+                  {speech?.createdAt?.seconds && (
                     <p className="text-xs text-gray-400 mt-1">
-                      {new Date(speech.createdAt?.seconds * 1000).toLocaleDateString()}
+                      {new Date(
+                        speech.createdAt.seconds * 1000
+                      ).toLocaleDateString()}
                     </p>
                   )}
                 </div>
@@ -109,22 +113,6 @@ export default function DashboardPage() {
           </div>
         </>
       )}
-
-      setChecking(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  if (checking) {
-    return <div className="p-10">Loading...</div>;
-  }
-
-  return (
-    <main className="p-10">
-      <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
-
-      <p>Total Speeches: {speeches.length}</p>
     </main>
   );
 }
