@@ -6,9 +6,6 @@ import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, getDocs } from "firebase/firestore";
 
 export default function DashboardPage() {
-  const [speechCount, setSpeechCount] = useState(0);
-  const [recentSpeeches, setRecentSpeeches] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -32,15 +29,6 @@ export default function DashboardPage() {
           ...doc.data(),
         }));
 
-        // Sort latest first (safe optional chaining)
-        speechList.sort((a: any, b: any) => {
-          return (b?.createdAt?.seconds || 0) - (a?.createdAt?.seconds || 0);
-        });
-
-        if (isMounted) {
-          setSpeechCount(snapshot.size);
-          setRecentSpeeches(speechList.slice(0, 5));
-        }
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       } finally {
@@ -54,64 +42,43 @@ export default function DashboardPage() {
     };
   }, []);
 
+  const avgScore =
+    speeches.reduce((sum, s) => sum + (s.analytics?.score || 0), 0) /
+    (speeches.length || 1);
+
+  if (checking) {
+    return <div className="p-10 text-gray-500">Loading dashboard...</div>;
+  }
+
   return (
-    <main className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+    <main className="p-10 bg-gray-50 min-h-screen">
+      <h1 className="text-3xl font-bold mb-8 text-gray-800">Dashboard</h1>
 
-      {/* Loading */}
-      {loading && (
-        <p className="text-gray-500 animate-pulse">
-          Loading dashboard...
+      {/* Stats Overview Card */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">
+            Total Speeches
+          </p>
+          <p className="text-4xl font-bold text-blue-600 mt-1">
+            {speeches.length}
+          </p>
+        </div>
+
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">
+            Average Score
+          </p>
+          <p className="text-4xl font-bold text-green-600 mt-1">
+            {Math.round(avgScore)}%
+          </p>
+        </div>
+      </div>
+
+      {speeches.length === 0 && (
+        <p className="mt-10 text-gray-500 italic">
+          No data available. Upload a speech to see your progress!
         </p>
-      )}
-
-      {/* Content */}
-      {!loading && (
-        <>
-          {/* Summary */}
-          <div className="bg-white shadow-md border border-gray-100 rounded-xl p-6 mb-8">
-            <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wider">
-              Total Speeches
-            </h2>
-            <p className="text-4xl font-bold text-blue-600">
-              {speechCount}
-            </p>
-          </div>
-
-          {/* Recent Speeches */}
-          <div>
-            <h2 className="text-xl font-semibold mb-4 text-gray-800">
-              Recent Speeches
-            </h2>
-
-            {recentSpeeches.length === 0 ? (
-              <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-10 text-center">
-                <p className="text-gray-500">
-                  No speeches found. Start by creating one!
-                </p>
-              </div>
-            ) : (
-              recentSpeeches.map((speech) => (
-                <div
-                  key={speech.id}
-                  className="bg-white shadow-sm border border-gray-100 rounded-xl p-4 mb-4 hover:shadow-md transition-shadow"
-                >
-                  <h3 className="text-md font-semibold text-gray-700">
-                    {speech.title || "Untitled Speech"}
-                  </h3>
-
-                  {speech?.createdAt?.seconds && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      {new Date(
-                        speech.createdAt.seconds * 1000
-                      ).toLocaleDateString()}
-                    </p>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        </>
       )}
     </main>
   );
