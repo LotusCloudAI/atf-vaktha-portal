@@ -6,15 +6,13 @@ import { collection, getDocs, query, orderBy, limit, where } from "firebase/fire
 
 export default function LeaderboardPage() {
   const [speakers, setSpeakers] = useState<any[]>([]);
-  const [level, setLevel] = useState("Global"); // Levels: Global, Country, State, Club
+  const [level, setLevel] = useState("Global");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
       setLoading(true);
       try {
-        // TASK-14: Ranking logic based on scores
-        // Note: This assumes transcripts have a 'score' field from the AI engine
         const q = query(
           collection(db, "transcripts"),
           orderBy("score", "desc"),
@@ -24,7 +22,6 @@ export default function LeaderboardPage() {
         const snapshot = await getDocs(q);
         setSpeakers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (error) {
-        // Handled silently per Section 8
       } finally {
         setLoading(false);
       }
@@ -42,7 +39,6 @@ export default function LeaderboardPage() {
           <p className="text-slate-500 mt-2 font-medium">Top performing speakers across the platform.</p>
         </header>
 
-        {/* Task 14 Requirement: Leaderboard Levels */}
         <div className="flex justify-center gap-2 mb-10 bg-slate-200 p-1 rounded-2xl w-fit mx-auto">
           {["Global", "Country", "State", "Club"].map((tab) => (
             <button
