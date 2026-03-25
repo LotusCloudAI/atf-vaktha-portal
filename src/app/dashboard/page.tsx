@@ -6,13 +6,13 @@ import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, getDocs } from "firebase/firestore";
 
 export default function DashboardPage() {
-  const [speeches, setSpeeches] = useState<any[]>([]);
-  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        setChecking(false);
+        if (isMounted) setLoading(false);
         return;
       }
 
@@ -24,20 +24,22 @@ export default function DashboardPage() {
 
         const snapshot = await getDocs(q);
 
-        const speechList = snapshot.docs.map((doc) => ({
+        let speechList = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
 
-        setSpeeches(speechList);
       } catch (error) {
-        console.error("Error loading speeches:", error);
+        console.error("Error fetching dashboard data:", error);
+      } finally {
+        if (isMounted) setLoading(false);
       }
-
-      setChecking(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   const avgScore =

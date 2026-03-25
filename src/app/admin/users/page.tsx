@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
   getDocs,
@@ -21,7 +22,18 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchUsers = async () => {
+
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+
+      console.log("🔥 CURRENT USER UID:", user?.uid);
+      console.log("🔥 CURRENT USER EMAIL:", user?.email);
+
+      if (!user) {
+        console.error("❌ No user logged in");
+        setLoading(false);
+        return;
+      }
+
       try {
         const snapshot = await getDocs(collection(db, "users"));
 
@@ -33,13 +45,15 @@ export default function UsersPage() {
         setUsers(data);
 
       } catch (error) {
-        console.error("Error fetching users:", error);
+        console.error("❌ Error fetching users:", error);
       } finally {
         setLoading(false);
       }
-    };
 
-    fetchUsers();
+    });
+
+    return () => unsubscribe();
+
   }, []);
 
   const updateRole = async (userId: string, newRole: string) => {
@@ -48,7 +62,6 @@ export default function UsersPage() {
         role: newRole,
       });
 
-      // Update UI instantly
       setUsers((prev) =>
         prev.map((u) =>
           u.id === userId ? { ...u, role: newRole } : u
@@ -56,7 +69,7 @@ export default function UsersPage() {
       );
 
     } catch (error) {
-      console.error("Error updating role:", error);
+      console.error("❌ Error updating role:", error);
     }
   };
 
@@ -96,7 +109,6 @@ export default function UsersPage() {
 
               <td className="p-3 flex gap-3">
 
-                {/* Promote */}
                 {user.role !== "admin" && (
                   <button
                     onClick={() => updateRole(user.id, "admin")}
@@ -106,7 +118,6 @@ export default function UsersPage() {
                   </button>
                 )}
 
-                {/* Demote */}
                 {user.role === "admin" && (
                   <button
                     onClick={() => updateRole(user.id, "member")}
