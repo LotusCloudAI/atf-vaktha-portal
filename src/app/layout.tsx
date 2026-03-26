@@ -1,19 +1,20 @@
 import "./globals.css";
-export const metadata = {
+import React from "react";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
   title: "ATF Vaktha Portal",
   description: "Leadership • Communication • Confidence",
 };
 
-export default function RootLayout({
-  children,
-}: {
+type RootLayoutProps = {
   children: React.ReactNode;
-}) {
+};
+
+export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en">
-      <body>
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
