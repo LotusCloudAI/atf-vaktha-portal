@@ -1,7 +1,12 @@
+import React from "react";
 import Header from "@/components/website/Header";
 import Footer from "@/components/website/Footer";
 
-export default function Layout({ children }) {
+type LayoutProps = {
+  children: React.ReactNode;
+};
+
+export default function Layout({ children }: LayoutProps) {
   return (
     <>
       <Header />
