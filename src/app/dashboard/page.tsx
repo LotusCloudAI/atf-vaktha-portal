@@ -5,7 +5,17 @@ import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, getDocs } from "firebase/firestore";
 
+type Speech = {
+  id: string;
+  analytics?: {
+    score?: number;
+  };
+  [key: string]: any;
+};
+
 export default function DashboardPage() {
+  const [speeches, setSpeeches] = useState<Speech[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -24,11 +34,14 @@ export default function DashboardPage() {
 
         const snapshot = await getDocs(q);
 
-        let speechList = snapshot.docs.map((doc) => ({
+        const speechList: Speech[] = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
 
+        if (isMounted) {
+          setSpeeches(speechList);
+        }
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       } finally {
@@ -46,7 +59,7 @@ export default function DashboardPage() {
     speeches.reduce((sum, s) => sum + (s.analytics?.score || 0), 0) /
     (speeches.length || 1);
 
-  if (checking) {
+  if (loading) {
     return <div className="p-10 text-gray-500">Loading dashboard...</div>;
   }
 
