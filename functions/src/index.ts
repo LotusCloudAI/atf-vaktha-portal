@@ -7,7 +7,7 @@ import * as path from "path";
 
 /**
  * ATF VAKTHA - BACKEND & AI EXECUTION (PAVAN)
- * Merges existing scoring logic with Phase 1 & 2 requirements.
+ * Merges existing scoring logic with Phase 1, Phase 2, and Phase 7 requirements.
  */
 
 if (admin.apps.length === 0) {
@@ -15,6 +15,7 @@ if (admin.apps.length === 0) {
 }
 
 const speechClient = new SpeechClient();
+const db = admin.firestore();
 
 // Configure Function Region and Limits
 setGlobalOptions({
@@ -27,7 +28,8 @@ const FILLER_WORDS_LIST = ["um", "uh", "like", "you know", "actually", "basicall
 
 /**
  * Speech Score Algorithm
- * Logic mapped to required frontend display fields (totalScore, clarityScore, confidenceScore).
+ * Logic mapped to required frontend display fields (totalScore, clarityScore, confidenceScore)
+ * Updated for Phase 2: Added speedScore and feedback.
  */
 function calculateSpeechScore(wordCount: number, fillerRate: number, wpm: number, vocabularyRatio: number) {
   let paceScore = 0;
@@ -59,10 +61,27 @@ function calculateSpeechScore(wordCount: number, fillerRate: number, wpm: number
   else if (wordCount > 50) lengthScore = 15;
   else lengthScore = 10;
 
+  // Phase 2: speedScore calculation (100 base, penalized for being too fast/slow)
+  let speedScore = 100;
+  if (wpm < 110) speedScore = Math.max(0, 100 - (110 - wpm));
+  else if (wpm > 160) speedScore = Math.max(0, 100 - (wpm - 160));
+
+  // Phase 2: AI Feedback generation
+  let feedback = "Great job! Your speech was clear and well-paced.";
+  if (fillerRate >= 0.05) {
+    feedback = "Try to reduce filler words to improve your clarity score.";
+  } else if (wpm > 170) {
+    feedback = "You are speaking a bit too fast. Try slowing down your pace for better comprehension.";
+  } else if (wpm < 100 && wordCount > 20) {
+    feedback = "Your pace is a bit slow. Try speaking with a bit more energy and flow.";
+  }
+
   return {
     total: paceScore + fillerScore + vocabScore + lengthScore,
     clarity: fillerScore * 4, // Normalized to 0-100
-    confidence: (paceScore + fillerScore) * 2 // Normalized to 0-100
+    confidence: (paceScore + fillerScore) * 2, // Normalized to 0-100
+    speed: speedScore,
+    feedback: feedback
   };
 }
 
@@ -79,6 +98,9 @@ export const processSpeechStorage = onObjectFinalized(
 
       const fileName = path.basename(filePath);
       const ext = path.extname(fileName).toLowerCase();
+      
+      // Phase 1: Assuming the filename (without extension) matches the Firestore document ID
+      const docId = path.basename(fileName, ext);
 
       // Validate audio format before processing
       if (!SUPPORTED_AUDIO.includes(ext)) {
@@ -117,15 +139,22 @@ export const processSpeechStorage = onObjectFinalized(
       const fillerRate = wordCount > 0 ? fillerWordCount / wordCount : 0;
       const vocabularyRatio = wordCount > 0 ? uniqueWords.size / wordCount : 0;
       
-      // Calculate Speaking Speed (WPM)
-      // Note: For a more accurate WPM, you could extract audio duration from the response if available.
-      const speedWPM = wordCount; 
+      // Calculate Speaking Speed (WPM) 
+      // Note: Replaced wordCount with an estimate (assuming 2 mins) to avoid 1:1 word-to-WPM error, 
+      // though extracting audio duration is best for production.
+      const speedWPM = wordCount / 2; 
 
-      // Run Scoring Logic
+      // Run Scoring Logic (Phase 2 updates included)
       const scores = calculateSpeechScore(wordCount, fillerRate, speedWPM, vocabularyRatio);
 
-      // Save to Firestore: Use collection 'speeches' to match Dashboard requirements
-      await admin.firestore().collection("speeches").add({
+      const speechRef = db.collection("speeches").doc(docId);
+      
+      // Fetch the existing document to grab the userId for Phase 7
+      const speechDoc = await speechRef.get();
+      const userId = speechDoc.exists ? speechDoc.data()?.userId : null;
+
+      // Phase 1 & 2: Update existing Firestore document with SAME docId
+      await speechRef.set({
         transcript,
         words: wordCount,
         fillerWords: fillerWordCount,
@@ -133,12 +162,24 @@ export const processSpeechStorage = onObjectFinalized(
         totalScore: scores.total,
         clarityScore: scores.clarity,
         confidenceScore: scores.confidence,
+        speedScore: scores.speed,      // Phase 2
+        feedback: scores.feedback,     // Phase 2
         vocabularyRatio,
-        fileName,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+        status: "completed",           // Good practice to let frontend know it's done
+        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
 
-      logger.log("AI analysis saved successfully to Firestore.");
+      logger.log(`AI analysis saved successfully to Firestore for document: ${docId}`);
+
+      // Phase 7: Gamification - Reward the user with points
+      if (userId) {
+        await db.collection("users").doc(userId).update({
+          points: admin.firestore.FieldValue.increment(10)
+        });
+        logger.log(`Awarded 10 points to user: ${userId}`);
+      } else {
+        logger.warn(`Could not award points: No userId found on speech doc ${docId}`);
+      }
 
     } catch (error) {
       logger.error("Speech processing failed:", error);
