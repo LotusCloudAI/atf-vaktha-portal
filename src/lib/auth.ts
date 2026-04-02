@@ -9,9 +9,15 @@ export const createUserIfNotExists = async (user: any) => {
     await setDoc(ref, {
       email: user.email,
       role: "member",
+<<<<<<< HEAD
       // Phase 7: Gamification Defaults
       points: 0,
       level: 1
     });
   }
 };
+=======
+    });
+  }
+};
+>>>>>>> origin/feature/frontend-ui
