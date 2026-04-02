@@ -1,98 +1,54 @@
-import { onObjectFinalized } from "firebase-functions/v2/storage";
-import * as admin from "firebase-admin";
 import { SpeechClient } from "@google-cloud/speech";
-
-admin.initializeApp();
 
 const client = new SpeechClient();
 
-export const processSpeech = onObjectFinalized(async (event) => {
-  const filePath = event.data.name;
-
-  if (!filePath || !filePath.includes("speeches/")) {
-    console.log("Not a speech file, skipping...");
-    return;
-  }
-
-  console.log("Processing file:", filePath);
-
-  try {
-    const bucket = admin.storage().bucket(event.data.bucket);
-    const file = bucket.file(filePath);
-
-    const [audioBytes] = await file.download();
-
-    const audio = {
-      content: audioBytes.toString("base64"),
-    };
-
-    const config = {
-      encoding: "LINEAR16" as const,
+export async function processSpeech(audioUrl: string) {
+  const [response] = await client.recognize({
+    audio: { uri: audioUrl },
+    config: {
+      encoding: "LINEAR16",
       languageCode: "en-US",
-    };
+    },
+  });
 
-    const request = {
-      audio,
-      config,
-    };
+  const transcript =
+    response.results?.map((r: any) => r.alternatives?.[0]?.transcript || "").join(" ") || "";
 
-    // 🔥 Google Speech-to-Text
-    const [response] = await client.recognize(request);
+  const words = transcript.trim() ? transcript.trim().split(/\s+/).length : 0;
 
-    // ✅ FIXED transcript parsing
-    const transcript =
-      response.results
-        ?.map((r: any) => r.alternatives?.[0]?.transcript || "")
-        .join(" ")
-        .trim() || "";
+  const fillerWords =
+    (transcript.toLowerCase().match(/\b(um|uh|like|you know)\b/g) || []).length;
 
-    console.log("Transcript:", transcript);
+  const speedWPM = words / 2;
 
-    // 🔥 ANALYTICS
-    const words = transcript ? transcript.split(/\s+/).length : 0;
+  const clarityScore = Math.max(0, 100 - fillerWords * 2);
+  const confidenceScore = Math.max(0, 100 - fillerWords * 3);
 
-    const fillerMatches =
-      transcript.match(/\b(um|uh|like|you know)\b/gi) || [];
+  let speedScore = 100;
+  if (speedWPM < 110) speedScore = Math.max(0, 100 - (110 - speedWPM));
+  else if (speedWPM > 160) speedScore = Math.max(0, 100 - (speedWPM - 160));
 
-    const fillerWords = fillerMatches.length;
+  let feedback = "Great job! Your speech was clear and well-paced.";
 
-    const speedWPM = words;
-    const speechScore = Math.max(0, 100 - fillerWords * 2);
-
-    console.log("Analytics:", {
-      words,
-      fillerWords,
-      speedWPM,
-      speechScore,
-    });
-
-    // 🔍 FIND DOCUMENT
-    const speechDocs = await admin
-      .firestore()
-      .collection("speeches")
-      .get();
-
-    for (const doc of speechDocs.docs) {
-      const data = doc.data();
-
-      if (data.audioUrl && data.audioUrl.includes(filePath)) {
-        console.log("Updating document:", doc.id);
-
-        await doc.ref.update({
-          transcript,
-          words,
-          fillerWords,
-          speedWPM,
-          speechScore,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          status: "completed",
-        });
-      }
-    }
-
-    console.log("Processing completed");
-
-  } catch (error) {
-    console.error("Error processing speech:", error);
+  if (fillerWords > 5) {
+    feedback = "Reduce filler words like 'um' and 'uh'.";
+  } else if (speedWPM > 160) {
+    feedback = "You are speaking too fast.";
+  } else if (speedWPM < 110 && words > 20) {
+    feedback = "Try speaking with more energy.";
   }
-});
+
+  const score = Math.round((clarityScore + confidenceScore + speedScore) / 3);
+
+  return {
+    transcript,
+    words,
+    fillerWords,
+    speedWPM,
+    clarityScore,
+    speedScore,
+    confidenceScore,
+    score,
+    feedback,
+  };
+}
