@@ -1,53 +1,59 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  setPersistence,
+  browserLocalPersistence,
+} from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 /**
- * Firebase Configuration
+ * Firebase Config
  */
-
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
-
-  // 🔥 IMPORTANT FIX — FORCE CORRECT BUCKET
-  storageBucket:
-    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
-    "atf-vaktha.firebasestorage.app",
-
-  messagingSenderId:
-    process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
+  storageBucket: "atf-vaktha.firebasestorage.app", // ✅ MUST match Firebase console EXACTLY
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
 };
 
 /**
- * Debug (only in browser)
+ * Initialize App (single instance)
+ */
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+
+/**
+ * Services
+ */
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+export const storage = getStorage(app);
+
+/**
+ * Providers
+ */
+export const googleProvider = new GoogleAuthProvider();
+
+/**
+ * 🔥 CRITICAL — Persist login (FIXES YOUR ISSUE)
+ */
+setPersistence(auth, browserLocalPersistence)
+  .then(() => {
+    console.log("✅ Auth persistence enabled");
+  })
+  .catch((error) => {
+    console.error("Auth persistence error:", error);
+  });
+
+/**
+ * Debug
  */
 if (typeof window !== "undefined") {
-  console.log("🔥 Firebase Config:", {
+  console.log("🔥 Firebase Initialized:", {
     projectId: firebaseConfig.projectId,
     storageBucket: firebaseConfig.storageBucket,
   });
 }
-
-/**
- * Initialize Firebase safely
- */
-const app = !getApps().length
-  ? initializeApp(firebaseConfig)
-  : getApp();
-
-/**
- * Firebase Services
- */
-
-export const auth = getAuth(app);
-
-export const googleProvider = new GoogleAuthProvider();
-
-export const db = getFirestore(app);
-
-// 🔥 IMPORTANT: Ensure correct bucket is used
-export const storage = getStorage(app, firebaseConfig.storageBucket);
