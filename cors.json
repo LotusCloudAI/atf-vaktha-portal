@@ -6,7 +6,7 @@
       "http://10.0.0.78:3000",
       "https://atf-vaktha-portal.vercel.app"
     ],
-    "method": ["GET", "POST", "PUT", "DELETE"],
+    "method": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     "responseHeader": [
       "Content-Type",
       "Authorization",
