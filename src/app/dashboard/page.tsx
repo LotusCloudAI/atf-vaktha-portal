@@ -82,46 +82,82 @@
 //   );
 // }
 
+
+
+// "use client";
+
+// import { useEffect, useState } from "react";
+// import { db } from "@/lib/firebase";
+// import { collection, getDocs } from "firebase/firestore";
+
+// export default function Dashboard() {
+//   const [speeches, setSpeeches] = useState<any[]>([]);
+//   const [loading, setLoading] = useState(true);
+
+//   useEffect(() => {
+//     const fetchData = async () => {
+//       try {
+//         const snapshot = await getDocs(collection(db, "speeches"));
+//         setSpeeches(snapshot.docs.map(doc => doc.data()));
+//       } catch {
+//         console.log("Error loading data");
+//       }
+//       setLoading(false);
+//     };
+
+//     fetchData();
+//   }, []);
+
+//   if (loading) return <p>Loading...</p>;
+
+//   return (
+//     <div className="p-6">
+//       <h1>Analytics</h1>
+
+//       {speeches.map((s: any, i) => (
+//         <div key={i} className="border p-4 mt-4">
+//           <p>Words: {s.words}</p>
+//           <p>Filler: {s.fillerWords}</p>
+//           <p>Speed: {s.speedWPM}</p>
+//           <p>Total Score: {s.totalScore}</p>
+//           <p>Clarity: {s.clarityScore}</p>
+//           <p>Confidence: {s.confidenceScore}</p>
+//         </div>
+//       ))}
+//     </div>
+//   );
+// }
+
+
 "use client";
 
 import { useEffect, useState } from "react";
-import { db } from "@/lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
+import { db, auth } from "@/lib/firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
 
 export default function Dashboard() {
-  const [speeches, setSpeeches] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [count, setCount] = useState(0);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const snapshot = await getDocs(collection(db, "speeches"));
-        setSpeeches(snapshot.docs.map(doc => doc.data()));
-      } catch {
-        console.log("Error loading data");
-      }
-      setLoading(false);
+    const load = async () => {
+      if (!auth.currentUser) return;
+
+      const q = query(
+        collection(db, "speeches"),
+        where("userUid", "==", auth.currentUser.uid)
+      );
+
+      const snap = await getDocs(q);
+      setCount(snap.size);
     };
 
-    fetchData();
+    load();
   }, []);
-
-  if (loading) return <p>Loading...</p>;
 
   return (
     <div className="p-6">
-      <h1>Analytics</h1>
-
-      {speeches.map((s: any, i) => (
-        <div key={i} className="border p-4 mt-4">
-          <p>Words: {s.words}</p>
-          <p>Filler: {s.fillerWords}</p>
-          <p>Speed: {s.speedWPM}</p>
-          <p>Total Score: {s.totalScore}</p>
-          <p>Clarity: {s.clarityScore}</p>
-          <p>Confidence: {s.confidenceScore}</p>
-        </div>
-      ))}
+      <h1 className="text-xl font-semibold">Dashboard</h1>
+      <p>Total Speeches: {count}</p>
     </div>
   );
 }
