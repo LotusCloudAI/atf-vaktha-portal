@@ -39,7 +39,6 @@ export const processSpeech = onObjectFinalized(async (event) => {
     // 🔥 Google Speech-to-Text
     const [response] = await client.recognize(request);
 
-    // ✅ FIXED transcript parsing
     const transcript =
       response.results
         ?.map((r: any) => r.alternatives?.[0]?.transcript || "")
@@ -56,8 +55,36 @@ export const processSpeech = onObjectFinalized(async (event) => {
 
     const fillerWords = fillerMatches.length;
 
-    const speedWPM = words;
-    const speechScore = Math.max(0, 100 - fillerWords * 2);
+    // Improved WPM estimation (basic fallback)
+    const durationMinutes = words > 0 ? words / 130 : 1;
+    const speedWPM = Math.round(words / durationMinutes);
+
+    // Phase 2 scoring
+    const clarityScore = Math.max(0, 100 - fillerWords * 2);
+    const confidenceScore = Math.max(0, 100 - fillerWords * 3);
+
+    let speedScore = 100;
+    if (speedWPM < 110) {
+      speedScore = Math.max(0, 100 - (110 - speedWPM));
+    } else if (speedWPM > 160) {
+      speedScore = Math.max(0, 100 - (speedWPM - 160));
+    }
+
+    let feedback = "Great job! Your speech was clear and well-paced.";
+    if (fillerWords > 5) {
+      feedback =
+        "Try to reduce filler words like 'um' and 'uh' to improve your clarity.";
+    } else if (speedWPM > 160) {
+      feedback =
+        "You are speaking a bit too fast. Try slowing down for better clarity.";
+    } else if (speedWPM < 110 && words > 20) {
+      feedback =
+        "Your pace is slightly slow. Try speaking with more energy.";
+    }
+
+    const speechScore = Math.round(
+      (clarityScore + confidenceScore + speedScore) / 3
+    );
 
     console.log("Analytics:", {
       words,
@@ -66,32 +93,31 @@ export const processSpeech = onObjectFinalized(async (event) => {
       speechScore,
     });
 
-    // 🔍 FIND DOCUMENT
-    const speechDocs = await admin
-      .firestore()
-      .collection("speeches")
-      .get();
+    // 🔥 IMPORTANT FIX (DO NOT LOOP ALL DOCS)
+    const docId = filePath.split("/")[1]?.split(".")[0];
 
-    for (const doc of speechDocs.docs) {
-      const data = doc.data();
-
-      if (data.audioUrl && data.audioUrl.includes(filePath)) {
-        console.log("Updating document:", doc.id);
-
-        await doc.ref.update({
-          transcript,
-          words,
-          fillerWords,
-          speedWPM,
-          speechScore,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          status: "completed",
-        });
-      }
+    if (!docId) {
+      console.log("Invalid docId, skipping...");
+      return;
     }
 
-    console.log("Processing completed");
+    console.log("Updating document:", docId);
 
+    await admin.firestore().collection("speeches").doc(docId).update({
+      transcript,
+      words,
+      fillerWords,
+      speedWPM,
+      clarityScore,
+      confidenceScore,
+      speedScore,
+      speechScore,
+      feedback,
+      status: "completed",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    console.log("Processing completed");
   } catch (error) {
     console.error("Error processing speech:", error);
   }
