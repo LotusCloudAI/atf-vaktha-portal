@@ -5,6 +5,7 @@ import { getStorage } from "firebase/storage";
 
 /**
  * Firebase Configuration
+ * ATF VAKTHA - FIREBASE CLIENT CONFIG (FINAL FIXED)
  */
 
 const firebaseConfig = {
@@ -16,6 +17,8 @@ const firebaseConfig = {
   storageBucket:
     process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
     "atf-vaktha.firebasestorage.app",
+  // CRITICAL FIX — FORCE CORRECT BUCKET
+  storageBucket: "atf-vaktha.firebasestorage.app",
 
   messagingSenderId:
     process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
@@ -27,6 +30,10 @@ const firebaseConfig = {
  */
 if (typeof window !== "undefined") {
   console.log("🔥 Firebase Config:", {
+ * Debug (Browser only)
+ */
+if (typeof window !== "undefined") {
+  console.log("Firebase Config:", {
     projectId: firebaseConfig.projectId,
     storageBucket: firebaseConfig.storageBucket,
   });
@@ -41,13 +48,20 @@ const app = !getApps().length
 
 /**
  * Firebase Services
+ * Prevent re-init (Next.js safe)
  */
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
+/**
+ * Services
+ */
 export const auth = getAuth(app);
-
 export const googleProvider = new GoogleAuthProvider();
-
 export const db = getFirestore(app);
 
 // 🔥 IMPORTANT: Ensure correct bucket is used
 export const storage = getStorage(app, firebaseConfig.storageBucket);
+// IMPORTANT — use same app
+export const storage = getStorage(app);
+
+export default app;

@@ -1,12 +1,31 @@
 "use client";
 
 import { useState } from "react";
+<<<<<<< HEAD
 import { auth, db } from "@/lib/firebase";
 import { analyzeSpeech } from "@/lib/analytics/analyzeSpeech";
 import { generateFeedback } from "@/lib/analytics/feedback";
 import { useRouter } from "next/navigation";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+=======
+import { useRouter } from "next/navigation";
+import { auth, db } from "@/lib/firebase";
+
+import {
+  addDoc,
+  collection,
+  serverTimestamp,
+  updateDoc, // ✅ FIXED: correct import
+} from "firebase/firestore";
+
+import {
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL,
+} from "firebase/storage";
+>>>>>>> feature/backend-ai
 
 export default function UploadSpeech() {
   const router = useRouter();
@@ -31,10 +50,16 @@ export default function UploadSpeech() {
       return;
     }
 
+    if (!file) {
+      alert("Please upload an audio file");
+      return;
+    }
+
     setUploading(true);
 
     try {
       const storage = getStorage();
+<<<<<<< HEAD
       let audioUrl = "";
       let videoUrl = "";
 
@@ -60,10 +85,19 @@ export default function UploadSpeech() {
         videoUrl,
         analytics,
         feedback,
+=======
+
+      // ✅ STEP 1 — CREATE FIRESTORE DOC FIRST
+      const docRef = await addDoc(collection(db, "speeches"), {
+        title,
+        content,
+>>>>>>> feature/backend-ai
         userUid: user.uid,
         createdAt: serverTimestamp(),
+        status: "processing",
       });
 
+<<<<<<< HEAD
       setTitle("");
       setContent("");
       setAudioFile(null);
@@ -73,6 +107,31 @@ export default function UploadSpeech() {
     } catch (error: any) {
       console.error("Upload process failed:", error);
       alert(`Upload failed: ${error.message || "Unknown error"}`);
+=======
+      // ✅ STEP 2 — USE SAME DOC ID FOR FILE
+      const fileExtension = file.name.split(".").pop();
+      const fileName = `speeches/${docRef.id}.${fileExtension}`; // ✅ FIXED
+
+      const storageRef = ref(storage, fileName);
+
+      // ✅ STEP 3 — UPLOAD FILE
+      await uploadBytes(storageRef, file);
+
+      const audioUrl = await getDownloadURL(storageRef);
+
+      // ✅ STEP 4 — UPDATE SAME DOCUMENT
+      await updateDoc(docRef, {
+        audioUrl,
+      });
+
+      alert("Upload successful. AI processing started.");
+
+      router.push("/dashboard/analytics");
+
+    } catch (error) {
+      console.error("Upload failed:", error);
+      alert("Upload failed");
+>>>>>>> feature/backend-ai
     } finally {
       setUploading(false);
     }

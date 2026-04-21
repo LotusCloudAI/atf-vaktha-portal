@@ -6,6 +6,7 @@
       "http://10.0.0.78:3000",
       "https://atf-vaktha-portal.vercel.app"
     ],
+    "origin": ["http://localhost:3000"],
     "method": ["GET", "POST", "PUT", "DELETE"],
     "responseHeader": [
       "Content-Type",
