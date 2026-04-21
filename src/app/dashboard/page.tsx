@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { auth, db } from "@/lib/firebase";
+import { auth, db } from "../../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, getDocs } from "firebase/firestore";
+import TranscriptViewer from "../../components/TranscriptViewer";
 
 type Speech = {
   id: string;
+  transcript?: string;
   analytics?: {
     score?: number;
   };
@@ -16,6 +18,7 @@ type Speech = {
 export default function DashboardPage() {
   const [speeches, setSpeeches] = useState<Speech[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -42,8 +45,9 @@ export default function DashboardPage() {
         if (isMounted) {
           setSpeeches(speechList);
         }
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
+      } catch (err) {
+        console.error("Error fetching dashboard data:", err);
+        if (isMounted) setError("Failed to load speeches");
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -55,13 +59,25 @@ export default function DashboardPage() {
     };
   }, []);
 
+  if (error) {
+    return (
+      <div className="text-center text-red-500 mt-10">
+        {error}
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="text-center mt-10 text-gray-600">
+        Processing your speeches...
+      </div>
+    );
+  }
+
   const avgScore =
     speeches.reduce((sum, s) => sum + (s.analytics?.score || 0), 0) /
     (speeches.length || 1);
-
-  if (loading) {
-    return <div className="p-10 text-gray-500">Loading dashboard...</div>;
-  }
 
   return (
     <main className="p-10 bg-gray-50 min-h-screen">
@@ -85,6 +101,25 @@ export default function DashboardPage() {
           <p className="text-4xl font-bold text-green-600 mt-1">
             {Math.round(avgScore)}%
           </p>
+        </div>
+      </div>
+
+      {/* Speeches List */}
+      <div className="mt-12 max-w-4xl">
+        <h2 className="text-xl font-semibold mb-4 text-gray-700">Recent Transcripts</h2>
+        <div className="space-y-6">
+          {speeches.map((speech) => (
+            <div key={speech.id} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-xs font-mono text-gray-400">ID: {speech.id}</span>
+                {speech.analytics?.score && (
+                  <span className="text-sm font-bold text-green-600">Score: {speech.analytics.score}%</span>
+                )}
+              </div>
+              
+              <TranscriptViewer transcript={speech.transcript || "No transcript available."} />
+            </div>
+          ))}
         </div>
       </div>
 

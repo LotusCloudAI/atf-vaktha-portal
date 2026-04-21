@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { auth, db } from "@/lib/firebase";
+import { auth, db } from "../../../lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 
 interface Speech {

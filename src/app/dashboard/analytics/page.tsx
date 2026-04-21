@@ -1,10 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { auth, db } from "@/lib/firebase";
+import { auth, db } from "../../../lib/firebase"; // ✅ FIXED PATH
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, query, where, getDocs } from "firebase/firestore";
-import AnalyticsCard from "@/components/dashboard/AnalyticsCard";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  orderBy,
+} from "firebase/firestore";
+import AnalyticsCard from "../../../components/dashboard/AnalyticsCard"; // ✅ FIXED PATH
 
 interface Speech {
   id: string;
@@ -13,11 +19,11 @@ interface Speech {
   audioUrl?: string;
   createdAt?: any;
 
-  speechScore?: number;
+  score?: number;
   words?: number;
-  speedWPM?: number;
+  wpm?: number;
   fillerWords?: number;
-  vocabularyScore?: number;
+
   transcript?: string;
 }
 
@@ -26,7 +32,9 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    let unsubscribeFirestore: any;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       if (!user) {
         setSpeeches([]);
         setLoading(false);
@@ -34,43 +42,98 @@ export default function AnalyticsPage() {
       }
 
       try {
+        // ✅ PRIMARY QUERY (WITH ORDER)
         const q = query(
           collection(db, "speeches"),
-          where("userUid", "==", user.uid)
+          where("userUid", "==", user.uid),
+          orderBy("createdAt", "desc")
         );
 
-        const snapshot = await getDocs(q);
+        unsubscribeFirestore = onSnapshot(
+          q,
+          (snapshot) => {
+            const data: Speech[] = snapshot.docs.map((doc) => {
+              const d = doc.data();
 
-        const data: Speech[] = snapshot.docs.map((doc) => {
-          const d = doc.data();
+              return {
+                id: doc.id,
+                title: d.title || "Untitled Speech",
+                status: d.status || "processing",
+                audioUrl: d.audioUrl || "",
+                createdAt: d.createdAt || null,
 
-          return {
-            id: doc.id,
-            title: d.title || "Untitled Speech",
-            status: d.status || "",
-            audioUrl: d.audioUrl || "",
-            createdAt: d.createdAt || null,
-            speechScore: d.speechScore || 0,
-            words: d.words || 0,
-            speedWPM: d.speedWPM || 0,
-            fillerWords: d.fillerWords || 0,
-            vocabularyScore: d.vocabularyScore || 0,
-            transcript: d.transcript || "",
-          };
-        });
+                score: d.score ?? 0,
+                words: d.words ?? 0,
+                wpm: d.wpm ?? 0,
+                fillerWords: d.fillerWords ?? 0,
 
-        setSpeeches(data);
+                transcript: d.transcript || "",
+              };
+            });
+
+            console.log("🔥 REALTIME UPDATE:", data);
+
+            setSpeeches(data);
+            setLoading(false);
+          },
+
+          // 🔥 CRITICAL: INDEX FALLBACK HANDLING
+          (error) => {
+            console.error("🔥 Snapshot Error:", error);
+
+            console.log("⚠️ Falling back (no orderBy)");
+
+            const fallbackQuery = query(
+              collection(db, "speeches"),
+              where("userUid", "==", user.uid)
+            );
+
+            unsubscribeFirestore = onSnapshot(fallbackQuery, (snapshot) => {
+              let data: Speech[] = snapshot.docs.map((doc) => {
+                const d = doc.data();
+
+                return {
+                  id: doc.id,
+                  title: d.title || "Untitled Speech",
+                  status: d.status || "processing",
+                  audioUrl: d.audioUrl || "",
+                  createdAt: d.createdAt || null,
+
+                  score: d.score ?? 0,
+                  words: d.words ?? 0,
+                  wpm: d.wpm ?? 0,
+                  fillerWords: d.fillerWords ?? 0,
+
+                  transcript: d.transcript || "",
+                };
+              });
+
+              // ✅ MANUAL SORT (IMPORTANT)
+              data = data.sort((a, b) => {
+                if (!a.createdAt || !b.createdAt) return 0;
+                return b.createdAt.seconds - a.createdAt.seconds;
+              });
+
+              console.log("⚠️ FALLBACK DATA:", data);
+
+              setSpeeches(data);
+              setLoading(false);
+            });
+          }
+        );
       } catch (error) {
-        console.error("Error fetching speeches:", error);
-      } finally {
+        console.error("Error initializing listener:", error);
         setLoading(false);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeFirestore) unsubscribeFirestore();
+    };
   }, []);
 
-  // ✅ Loading UI
+  // ✅ LOADING
   if (loading) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -83,12 +146,12 @@ export default function AnalyticsPage() {
     <main className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-6xl mx-auto">
 
-        {/* 🔥 Title */}
+        {/* TITLE */}
         <h1 className="text-3xl font-bold text-atfBlue mb-8">
           ATF Vaktha Analytics
         </h1>
 
-        {/* 📊 Summary Cards */}
+        {/* SUMMARY */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           <AnalyticsCard
             title="Total Speeches"
@@ -96,7 +159,7 @@ export default function AnalyticsPage() {
           />
         </div>
 
-        {/* 📭 Empty State */}
+        {/* EMPTY */}
         {speeches.length === 0 ? (
           <div className="bg-white p-8 rounded-xl shadow text-center">
             <p className="text-gray-600 text-lg">
@@ -110,17 +173,17 @@ export default function AnalyticsPage() {
                 key={speech.id}
                 className="bg-white p-6 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition"
               >
-                {/* 🎤 Title */}
+                {/* TITLE */}
                 <h2 className="text-lg font-semibold text-gray-800 mb-2">
                   {speech.title}
                 </h2>
 
-                {/* 🆔 ID */}
+                {/* ID */}
                 <p className="text-xs text-gray-500 mb-4">
                   ID: {speech.id.slice(0, 6)}
                 </p>
 
-                {/* 📈 Metrics */}
+                {/* METRICS */}
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <p className="text-gray-500">Words</p>
@@ -129,7 +192,7 @@ export default function AnalyticsPage() {
 
                   <div>
                     <p className="text-gray-500">WPM</p>
-                    <p className="font-semibold">{speech.speedWPM ?? 0}</p>
+                    <p className="font-semibold">{speech.wpm ?? 0}</p>
                   </div>
 
                   <div>
@@ -140,10 +203,21 @@ export default function AnalyticsPage() {
                   <div>
                     <p className="text-gray-500">Score</p>
                     <p className="font-semibold text-green-600">
-                      {speech.speechScore ?? 0}
+                      {speech.score ?? 0}
                     </p>
                   </div>
                 </div>
+
+                {/* STATUS */}
+                <p
+                  className={`mt-4 text-xs font-semibold ${
+                    speech.status === "completed"
+                      ? "text-green-600"
+                      : "text-yellow-600"
+                  }`}
+                >
+                  Status: {speech.status}
+                </p>
               </div>
             ))}
           </div>
