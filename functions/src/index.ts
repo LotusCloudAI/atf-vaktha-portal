@@ -1,330 +1,188 @@
 import { setGlobalOptions } from "firebase-functions/v2";
 import { onObjectFinalized, StorageEvent } from "firebase-functions/v2/storage";
 import * as logger from "firebase-functions/logger";
-
 import * as admin from "firebase-admin";
 import { SpeechClient, protos } from "@google-cloud/speech";
-
-import * as fs from "fs";
 import * as path from "path";
 
-admin.initializeApp();
+// Initialize Firebase Admin once
+if (admin.apps.length === 0) {
+  admin.initializeApp();
+}
 
 const speechClient = new SpeechClient();
+const db = admin.firestore();
 
-/**
- * Global configuration
- */
-
+// Global configuration for v2 functions
 setGlobalOptions({
   region: "us-central1",
   maxInstances: 10,
 });
 
-/**
- * Allowed audio formats
- */
-
 const SUPPORTED_AUDIO = [".wav", ".mp3", ".m4a"];
+const FILLER_WORDS_LIST = ["um", "uh", "like", "you know", "actually", "basically", "so", "right"];
 
 /**
- * Filler words dictionary
+ * PHASE 3 ENHANCED SCORING ENGINE
  */
+function calculateEnhancedMetrics(wordCount: number, fillerCount: number, wpm: number) {
+  // Clarity Score: Starts at 100, drops 2 points per filler word
+  const clarityScore = Math.max(0, 100 - fillerCount * 2);
 
-const FILLER_WORDS = [
-  "um",
-  "uh",
-  "like",
-  "you",
-  "know",
-  "actually",
-  "basically",
-  "so",
-  "right",
-];
+  // Speed Score: Ideal pace is 120-160 WPM
+  let speedScore = 70;
+  if (wpm >= 120 && wpm <= 160) speedScore = 100;
+  else if ((wpm >= 100 && wpm < 120) || (wpm > 160 && wpm <= 180)) speedScore = 85;
 
-/**
- * Speech Score Algorithm
- */
+  // Overall Score: Weighted average (60% Clarity, 40% Speed)
+  const overallScore = Math.round(clarityScore * 0.6 + speedScore * 0.4);
 
-function calculateSpeechScore(
-  wordCount: number,
-  fillerRate: number,
-  wpm: number,
-  vocabularyRatio: number
-) {
+  // AI Feedback Engine
+  const strengths: string[] = [];
+  const weaknesses: string[] = [];
+  const suggestions: string[] = [];
 
-  let paceScore = 0;
-  let fillerScore = 0;
-  let vocabScore = 0;
-  let lengthScore = 0;
+  if (clarityScore > 80) {
+    strengths.push("Clear speech delivery");
+  } else {
+    weaknesses.push("Too many filler words");
+    suggestions.push("Reduce filler words like 'um', 'uh'");
+  }
 
-  /** Speaking Pace */
+  if (wpm >= 120 && wpm <= 160) {
+    strengths.push("Good speaking pace");
+  } else {
+    weaknesses.push("Speaking speed needs improvement");
+    suggestions.push("Maintain 120–160 words per minute");
+  }
 
-  if (wpm >= 120 && wpm <= 170) paceScore = 25;
-  else if (wpm >= 100 && wpm < 120) paceScore = 20;
-  else if (wpm > 170 && wpm <= 190) paceScore = 18;
-  else paceScore = 10;
+  if (wordCount < 50) {
+    weaknesses.push("Speech content is too short");
+    suggestions.push("Expand with more supporting ideas");
+  }
 
-  /** Filler words */
-
-  if (fillerRate < 0.01) fillerScore = 25;
-  else if (fillerRate < 0.03) fillerScore = 20;
-  else if (fillerRate < 0.05) fillerScore = 15;
-  else fillerScore = 10;
-
-  /** Vocabulary diversity */
-
-  if (vocabularyRatio > 0.6) vocabScore = 25;
-  else if (vocabularyRatio > 0.45) vocabScore = 20;
-  else if (vocabularyRatio > 0.35) vocabScore = 15;
-  else vocabScore = 10;
-
-  /** Speech length */
-
-  if (wordCount > 120) lengthScore = 25;
-  else if (wordCount > 80) lengthScore = 20;
-  else if (wordCount > 50) lengthScore = 15;
-  else lengthScore = 10;
-
-  return paceScore + fillerScore + vocabScore + lengthScore;
+  return {
+    overallScore,
+    clarityScore,
+    speedScore,
+    aiFeedback: { strengths, weaknesses, suggestions }
+  };
 }
 
-/**
- * AI Feedback Generator
- */
-
-function generateFeedback(
-  fillerRate: number,
-  wpm: number
-) {
-
-  if (fillerRate > 0.05)
-    return "Reduce filler words for stronger delivery.";
-
-  if (wpm > 170)
-    return "Speaking speed is high. Consider slowing down.";
-
-  if (wpm < 110)
-    return "Speech pacing is slow. Try increasing energy.";
-
-  return "Excellent delivery. Maintain this pace.";
-}
-
-/**
- * ATF Vaktha Speech Processing
- */
-
-export const processSpeechStorage = onObjectFinalized(
-  async (event: StorageEvent) => {
-
-    let tempFile = "";
-
-    try {
-
-      const filePath = event.data.name;
-      const bucketName = event.data.bucket;
-
-      if (!filePath) {
-        logger.warn("No file path found.");
-        return;
-      }
-
-      /**
-       * Only process speeches folder
-       */
-
-      if (!filePath.startsWith("speeches/")) {
-        logger.log("Ignoring non speech file:", filePath);
-        return;
-      }
-
-      logger.log("Processing speech:", filePath);
-
-      const bucket = admin.storage().bucket(bucketName);
-      const file = bucket.file(filePath);
-
-      const fileName = path.basename(filePath);
-      const ext = path.extname(fileName).toLowerCase();
-
-      /**
-       * Validate audio format
-       */
-
-      if (!SUPPORTED_AUDIO.includes(ext)) {
-        logger.warn("Unsupported audio format:", fileName);
-        return;
-      }
-
-      /**
-       * Download to temp
-       */
-
-      tempFile = `/tmp/${fileName}`;
-
-      await file.download({
-        destination: tempFile,
-      });
-
-      logger.log("File downloaded:", tempFile);
-
-      /**
-       * Speech-to-Text request
-       */
-
-      const audioUri = `gs://${bucketName}/${filePath}`;
-
-      const request: protos.google.cloud.speech.v1.ILongRunningRecognizeRequest =
-        {
-          audio: {
-            uri: audioUri,
-          },
-          config: {
-            encoding:
-              protos.google.cloud.speech.v1.RecognitionConfig.AudioEncoding
-                .LINEAR16,
-            languageCode: "en-US",
-            enableAutomaticPunctuation: true,
-            model: "latest_long",
-          },
-        };
-
-      const [operation] =
-        await speechClient.longRunningRecognize(request);
-
-      const [response] = await operation.promise();
-
-      const transcript =
-        response.results
-          ?.map((r) => r.alternatives?.[0]?.transcript || "")
-          .join(" ")
-          .trim() || "";
-
-      logger.log("Transcript created");
-
-      /**
-       * Word processing
-       */
-
-      const words = transcript
-        .toLowerCase()
-        .split(/\s+/)
-        .filter(Boolean);
-
-      const wordCount = words.length;
-
-      /**
-       * Filler words
-       */
-
-      const fillerWordCount = words.filter((w) =>
-        FILLER_WORDS.includes(w)
-      ).length;
-
-      const fillerRate =
-        wordCount > 0
-          ? Number((fillerWordCount / wordCount).toFixed(3))
-          : 0;
-
-      /**
-       * Vocabulary richness
-       */
-
-      const uniqueWords = new Set(words);
-
-      const vocabularyRatio =
-        wordCount > 0
-          ? Number((uniqueWords.size / wordCount).toFixed(2))
-          : 0;
-
-      /**
-       * Speaking speed (approximate)
-       */
-
-      const wordsPerMinute =
-        wordCount > 0
-          ? Math.round(wordCount / 1)
-          : 0;
-
-      /**
-       * Speech Score
-       */
-
-      const speechScore = calculateSpeechScore(
-        wordCount,
-        fillerRate,
-        wordsPerMinute,
-        vocabularyRatio
-      );
-
-      /**
-       * AI feedback
-       */
-
-      const aiFeedback = generateFeedback(
-        fillerRate,
-        wordsPerMinute
-      );
-
-      /**
-       * Extract metadata
-       */
-
-      const parts = filePath.split("/");
-
-      const userId = parts[1] || "unknown";
-
-      const speechFile = parts[2] || fileName;
-
-      /**
-       * Save to Firestore
-       */
-
-      const doc = await admin
-        .firestore()
-        .collection("transcripts")
-        .add({
-
-          userId,
-          speechFile,
-
-          transcriptText: transcript,
-
-          wordCount,
-          fillerWordCount,
-          fillerRate,
-
-          wordsPerMinute,
-          vocabularyRatio,
-
-          speechScore,
-          aiFeedback,
-
-          createdAt:
-            admin.firestore.FieldValue.serverTimestamp(),
-        });
-
-      logger.log("Transcript saved:", doc.id);
-
-    } catch (error) {
-
-      logger.error("Speech processing failed:", error);
-
-    } finally {
-
-      try {
-
-        if (tempFile && fs.existsSync(tempFile)) {
-          fs.unlinkSync(tempFile);
-        }
-
-      } catch (cleanupError) {
-
-        logger.warn("Temp cleanup failed:", cleanupError);
-
-      }
-
+// ==========================================
+// MAIN EXPORT (Triggered by Storage)
+// ==========================================
+export const processSpeechStorage = onObjectFinalized(async (event: StorageEvent) => {
+  try {
+    const filePath = event.data.name;
+    const bucketName = event.data.bucket;
+
+    if (!filePath || !filePath.startsWith("speeches/")) return;
+
+    const fileName = path.basename(filePath);
+    const ext = path.extname(fileName).toLowerCase();
+    
+    // docId extraction: speeches/abc.wav -> abc
+    const docId = fileName.replace(ext, "");
+
+    if (!SUPPORTED_AUDIO.includes(ext)) {
+      logger.warn("Unsupported format:", ext);
+      return;
     }
 
+    const audioUri = `gs://${bucketName}/${filePath}`;
+    logger.log(`Processing: ${audioUri}`);
+
+    // Encoding Logic
+    let encoding;
+    if (ext === ".mp3") {
+      encoding = protos.google.cloud.speech.v1.RecognitionConfig.AudioEncoding.MP3;
+    } else if (ext === ".wav") {
+      encoding = protos.google.cloud.speech.v1.RecognitionConfig.AudioEncoding.LINEAR16;
+    } else {
+      encoding = protos.google.cloud.speech.v1.RecognitionConfig.AudioEncoding.ENCODING_UNSPECIFIED;
+    }
+
+    const request = {
+      audio: { uri: audioUri },
+      config: {
+        encoding,
+        languageCode: "en-US",
+        enableAutomaticPunctuation: true,
+        model: "latest_long",
+      },
+    };
+
+    const [operation] = await speechClient.longRunningRecognize(request);
+    const [response] = await operation.promise();
+
+    const transcript = response.results
+      ?.map(r => r.alternatives?.[0]?.transcript || "")
+      .join(" ")
+      .trim() || "";
+
+    if (!transcript) {
+      logger.warn("Empty transcript for:", docId);
+      return;
+    }
+
+    // Phase 3 Metrics
+    const wordsArray = transcript.toLowerCase().split(/\s+/).filter(Boolean);
+    const wordCount = wordsArray.length;
+    const fillerCount = wordsArray.filter(w => FILLER_WORDS_LIST.includes(w)).length;
+
+    // Duration extraction: use metadata if available, else default to 60s
+    const audioDuration = Number(event.data.metadata?.duration) || 60;
+    const durationMinutes = Math.max(audioDuration / 60, 0.5);
+    const speedWPM = Math.round(wordCount / durationMinutes);
+
+    // Calculate Enhanced Scores
+    const results = calculateEnhancedMetrics(wordCount, fillerCount, speedWPM);
+
+    const speechRef = db.collection("speeches").doc(docId);
+    const speechDoc = await speechRef.get();
+    const userUid = speechDoc.exists ? speechDoc.data()?.userUid : null;
+
+    // FIRESTORE FINAL PHASE 3 SCHEMA
+    await speechRef.set(
+      {
+        transcript,
+        
+        // TOP-LEVEL FIELDS FOR PORTAL UI
+        words: wordCount,
+        wpm: speedWPM,
+        speedWPM: speedWPM, 
+        fillerWords: fillerCount,
+        score: results.overallScore,
+
+        // Nested metrics
+        metrics: {
+          words: wordCount,
+          wpm: speedWPM,
+          fillerWords: fillerCount,
+          clarityScore: results.clarityScore,
+          speedScore: results.speedScore,
+        },
+        
+        overallScore: results.overallScore,
+        aiFeedback: results.aiFeedback,
+        scoringVersion: "v2-phase3",
+        status: "completed",
+        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    if (userUid) {
+      await db.collection("users").doc(userUid).update({
+        points: admin.firestore.FieldValue.increment(10),
+      });
+    }
+
+    logger.log("SUCCESS: Phase 3 processing complete for", docId);
+
+  } catch (error: any) {
+    logger.error("ERROR in processSpeechStorage:", error);
   }
-);
+});

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { auth, db } from "../../lib/firebase"; // Using the path that worked for you previously
+import { auth, db } from "../../lib/firebase"; 
 import { collection, query, where, getDocs, limit, orderBy } from "firebase/firestore";
 import Link from "next/link";
 

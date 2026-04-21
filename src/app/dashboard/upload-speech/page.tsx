@@ -1,12 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { auth, db } from "@/lib/firebase";
-import { analyzeSpeech } from "@/lib/analytics/analyzeSpeech";
-import { generateFeedback } from "@/lib/analytics/feedback";
 import { useRouter } from "next/navigation";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { auth, db } from "@/lib/firebase";
+import {
+  addDoc,
+  collection,
+  serverTimestamp,
+  updateDoc,
+} from "firebase/firestore";
+import {
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL,
+} from "firebase/storage";
 
 export default function UploadSpeech() {
   const router = useRouter();
@@ -31,47 +39,55 @@ export default function UploadSpeech() {
       return;
     }
 
+    if (!audioFile) {
+      alert("Please upload an audio file");
+      return;
+    }
+
     setUploading(true);
 
     try {
       const storage = getStorage();
-      let audioUrl = "";
-      let videoUrl = "";
 
-      if (audioFile) {
-        const audioRef = ref(storage, `speeches/${user.uid}/${Date.now()}_${audioFile.name}`);
-        const snapshot = await uploadBytes(audioRef, audioFile);
-        audioUrl = await getDownloadURL(snapshot.ref);
-      }
-
-      if (videoFile) {
-        const videoRef = ref(storage, `videos/${user.uid}/${Date.now()}_${videoFile.name}`);
-        const snapshot = await uploadBytes(videoRef, videoFile);
-        videoUrl = await getDownloadURL(snapshot.ref);
-      }
-
-      const analytics = analyzeSpeech(content, 60);
-      const feedback = generateFeedback(analytics.score);
-
-      await addDoc(collection(db, "speeches"), {
+      // STEP 1 — CREATE FIRESTORE DOC FIRST
+      // This gives us a unique ID to name our storage files consistently
+      const docRef = await addDoc(collection(db, "speeches"), {
         title: title.trim(),
         content: content.trim(),
-        audioUrl,
-        videoUrl,
-        analytics,
-        feedback,
         userUid: user.uid,
         createdAt: serverTimestamp(),
+        status: "processing", // Triggers the Cloud Function
       });
 
-      setTitle("");
-      setContent("");
-      setAudioFile(null);
-      setVideoFile(null);
+      // STEP 2 — UPLOAD AUDIO USING DOC ID
+      const audioExtension = audioFile.name.split(".").pop();
+      const audioPath = `speeches/${docRef.id}.${audioExtension}`;
+      const audioRef = ref(storage, audioPath);
+      
+      await uploadBytes(audioRef, audioFile);
+      const audioUrl = await getDownloadURL(audioRef);
 
-      router.push("/dashboard");
+      // STEP 3 — UPLOAD VIDEO (OPTIONAL)
+      let videoUrl = "";
+      if (videoFile) {
+        const videoExtension = videoFile.name.split(".").pop();
+        const videoPath = `videos/${docRef.id}.${videoExtension}`;
+        const videoRef = ref(storage, videoPath);
+        await uploadBytes(videoRef, videoFile);
+        videoUrl = await getDownloadURL(videoRef);
+      }
+
+      // STEP 4 — UPDATE DOCUMENT WITH URLS
+      await updateDoc(docRef, {
+        audioUrl,
+        videoUrl,
+      });
+
+      alert("Upload successful. AI processing started.");
+      router.push("/dashboard/analytics");
+
     } catch (error: any) {
-      console.error("Upload process failed:", error);
+      console.error("Upload failed:", error);
       alert(`Upload failed: ${error.message || "Unknown error"}`);
     } finally {
       setUploading(false);

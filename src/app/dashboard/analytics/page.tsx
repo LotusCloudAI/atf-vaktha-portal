@@ -13,7 +13,7 @@ interface Speech {
   audioUrl?: string;
   createdAt?: any;
 
-  speechScore?: number;
+  score?: number;
   words?: number;
   speedWPM?: number;
   fillerWords?: number;
@@ -44,13 +44,19 @@ export default function AnalyticsPage() {
         const data: Speech[] = snapshot.docs.map((doc) => {
           const d = doc.data();
 
+          // 🔥 FINAL SCORE FIX (CRITICAL)
+          const finalScore = Number(
+            d.score ?? d.speechScore ?? d.totalScore ?? 0
+          );
+
           return {
             id: doc.id,
             title: d.title || "Untitled Speech",
             status: d.status || "",
             audioUrl: d.audioUrl || "",
             createdAt: d.createdAt || null,
-            speechScore: d.speechScore || 0,
+
+            score: finalScore,
             words: d.words || 0,
             speedWPM: d.speedWPM || 0,
             fillerWords: d.fillerWords || 0,
@@ -70,7 +76,6 @@ export default function AnalyticsPage() {
     return () => unsubscribe();
   }, []);
 
-  // ✅ Loading UI
   if (loading) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -83,12 +88,10 @@ export default function AnalyticsPage() {
     <main className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-6xl mx-auto">
 
-        {/* 🔥 Title */}
         <h1 className="text-3xl font-bold text-atfBlue mb-8">
           ATF Vaktha Analytics
         </h1>
 
-        {/* 📊 Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           <AnalyticsCard
             title="Total Speeches"
@@ -96,7 +99,6 @@ export default function AnalyticsPage() {
           />
         </div>
 
-        {/* 📭 Empty State */}
         {speeches.length === 0 ? (
           <div className="bg-white p-8 rounded-xl shadow text-center">
             <p className="text-gray-600 text-lg">
@@ -110,37 +112,36 @@ export default function AnalyticsPage() {
                 key={speech.id}
                 className="bg-white p-6 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition"
               >
-                {/* 🎤 Title */}
                 <h2 className="text-lg font-semibold text-gray-800 mb-2">
                   {speech.title}
                 </h2>
 
-                {/* 🆔 ID */}
                 <p className="text-xs text-gray-500 mb-4">
                   ID: {speech.id.slice(0, 6)}
                 </p>
 
-                {/* 📈 Metrics */}
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <p className="text-gray-500">Words</p>
-                    <p className="font-semibold">{speech.words ?? 0}</p>
+                    <p className="font-semibold">{speech.words}</p>
                   </div>
 
                   <div>
                     <p className="text-gray-500">WPM</p>
-                    <p className="font-semibold">{speech.speedWPM ?? 0}</p>
+                    <p className="font-semibold">{speech.speedWPM}</p>
                   </div>
 
                   <div>
                     <p className="text-gray-500">Filler Words</p>
-                    <p className="font-semibold">{speech.fillerWords ?? 0}</p>
+                    <p className="font-semibold">{speech.fillerWords}</p>
                   </div>
 
                   <div>
                     <p className="text-gray-500">Score</p>
                     <p className="font-semibold text-green-600">
-                      {speech.speechScore ?? 0}
+                      {speech.score && speech.score > 0
+                        ? speech.score
+                        : "-"}
                     </p>
                   </div>
                 </div>
