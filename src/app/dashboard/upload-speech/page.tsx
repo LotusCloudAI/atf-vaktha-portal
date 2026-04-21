@@ -1,31 +1,20 @@
 "use client";
 
 import { useState } from "react";
-<<<<<<< HEAD
-import { auth, db } from "@/lib/firebase";
-import { analyzeSpeech } from "@/lib/analytics/analyzeSpeech";
-import { generateFeedback } from "@/lib/analytics/feedback";
-import { useRouter } from "next/navigation";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-=======
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
-
 import {
   addDoc,
   collection,
   serverTimestamp,
-  updateDoc, // ✅ FIXED: correct import
+  updateDoc,
 } from "firebase/firestore";
-
 import {
   getStorage,
   ref,
   uploadBytes,
   getDownloadURL,
 } from "firebase/storage";
->>>>>>> feature/backend-ai
 
 export default function UploadSpeech() {
   const router = useRouter();
@@ -50,7 +39,7 @@ export default function UploadSpeech() {
       return;
     }
 
-    if (!file) {
+    if (!audioFile) {
       alert("Please upload an audio file");
       return;
     }
@@ -59,79 +48,47 @@ export default function UploadSpeech() {
 
     try {
       const storage = getStorage();
-<<<<<<< HEAD
-      let audioUrl = "";
-      let videoUrl = "";
 
-      if (audioFile) {
-        const audioRef = ref(storage, `speeches/${user.uid}/${Date.now()}_${audioFile.name}`);
-        const snapshot = await uploadBytes(audioRef, audioFile);
-        audioUrl = await getDownloadURL(snapshot.ref);
-      }
-
-      if (videoFile) {
-        const videoRef = ref(storage, `videos/${user.uid}/${Date.now()}_${videoFile.name}`);
-        const snapshot = await uploadBytes(videoRef, videoFile);
-        videoUrl = await getDownloadURL(snapshot.ref);
-      }
-
-      const analytics = analyzeSpeech(content, 60);
-      const feedback = generateFeedback(analytics.score);
-
-      await addDoc(collection(db, "speeches"), {
+      // STEP 1 — CREATE FIRESTORE DOC FIRST
+      // This gives us a unique ID to name our storage files consistently
+      const docRef = await addDoc(collection(db, "speeches"), {
         title: title.trim(),
         content: content.trim(),
-        audioUrl,
-        videoUrl,
-        analytics,
-        feedback,
-=======
-
-      // ✅ STEP 1 — CREATE FIRESTORE DOC FIRST
-      const docRef = await addDoc(collection(db, "speeches"), {
-        title,
-        content,
->>>>>>> feature/backend-ai
         userUid: user.uid,
         createdAt: serverTimestamp(),
-        status: "processing",
+        status: "processing", // Triggers the Cloud Function
       });
 
-<<<<<<< HEAD
-      setTitle("");
-      setContent("");
-      setAudioFile(null);
-      setVideoFile(null);
+      // STEP 2 — UPLOAD AUDIO USING DOC ID
+      const audioExtension = audioFile.name.split(".").pop();
+      const audioPath = `speeches/${docRef.id}.${audioExtension}`;
+      const audioRef = ref(storage, audioPath);
+      
+      await uploadBytes(audioRef, audioFile);
+      const audioUrl = await getDownloadURL(audioRef);
 
-      router.push("/dashboard");
-    } catch (error: any) {
-      console.error("Upload process failed:", error);
-      alert(`Upload failed: ${error.message || "Unknown error"}`);
-=======
-      // ✅ STEP 2 — USE SAME DOC ID FOR FILE
-      const fileExtension = file.name.split(".").pop();
-      const fileName = `speeches/${docRef.id}.${fileExtension}`; // ✅ FIXED
+      // STEP 3 — UPLOAD VIDEO (OPTIONAL)
+      let videoUrl = "";
+      if (videoFile) {
+        const videoExtension = videoFile.name.split(".").pop();
+        const videoPath = `videos/${docRef.id}.${videoExtension}`;
+        const videoRef = ref(storage, videoPath);
+        await uploadBytes(videoRef, videoFile);
+        videoUrl = await getDownloadURL(videoRef);
+      }
 
-      const storageRef = ref(storage, fileName);
-
-      // ✅ STEP 3 — UPLOAD FILE
-      await uploadBytes(storageRef, file);
-
-      const audioUrl = await getDownloadURL(storageRef);
-
-      // ✅ STEP 4 — UPDATE SAME DOCUMENT
+      // STEP 4 — UPDATE DOCUMENT WITH URLS
       await updateDoc(docRef, {
         audioUrl,
+        videoUrl,
       });
 
       alert("Upload successful. AI processing started.");
-
       router.push("/dashboard/analytics");
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Upload failed:", error);
-      alert("Upload failed");
->>>>>>> feature/backend-ai
+      alert(`Upload failed: ${error.message || "Unknown error"}`);
     } finally {
       setUploading(false);
     }

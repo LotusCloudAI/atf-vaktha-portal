@@ -1,213 +1,163 @@
 import { onObjectFinalized } from "firebase-functions/v2/storage";
 import * as admin from "firebase-admin";
-import { SpeechClient } from "@google-cloud/speech";
 
-admin.initializeApp();
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
 
-const client = new SpeechClient();
+const db = admin.firestore();
 
-export const processSpeech = onObjectFinalized(async (event) => {
-  const filePath = event.data.name;
-
-  if (!filePath || !filePath.includes("speeches/")) {
-    console.log("Not a speech file, skipping...");
-    return;
-  }
-
-  console.log("Processing file:", filePath);
-
-  try {
-    const bucket = admin.storage().bucket(event.data.bucket);
-    const file = bucket.file(filePath);
-
-    const [audioBytes] = await file.download();
-
-    const audio = {
-      content: audioBytes.toString("base64"),
-    };
-
-    const config = {
-      encoding: "LINEAR16" as const,
-      languageCode: "en-US",
-    };
-
-    const request = {
-      audio,
-      config,
-    };
-
-    // 🔥 Google Speech-to-Text
-    const [response] = await client.recognize(request);
-
-    // ✅ FIXED transcript parsing
-    const transcript =
-      response.results
-        ?.map((r: any) => r.alternatives?.[0]?.transcript || "")
-import { getFirestore } from "firebase-admin/firestore";
-import { initializeApp } from "firebase-admin/app";
-import speech from "@google-cloud/speech";
-
-// Initialize Firebase Admin (prevent re-init in hot reload)
-initializeApp();
-
-// Initialize Speech Client
-const speechClient = new speech.SpeechClient();
-
-export const processSpeech = onObjectFinalized(async (event) => {
+/**
+ * ATF VAKTHA — AI SPEECH PROCESSOR (PHASE 2 + 3 READY)
+ */
+export const processSpeechStorage = onObjectFinalized(async (event) => {
   const object = event.data;
+  const filePath = object.name || "";
 
-  console.log("FUNCTION TRIGGERED");
+  // ----------------------------------
+  // 1. FILTER VALID FILES
+  // ----------------------------------
+  if (!filePath.includes("speeches/")) return;
 
-  const fileName = object.name;
+  if (!(filePath.endsWith(".wav") || filePath.endsWith(".mp3"))) return;
 
-  if (!fileName) {
-    console.log("No file name found");
-    return;
-  }
+  // ----------------------------------
+  // 2. SAFE DOC ID EXTRACTION
+  // ----------------------------------
+  const fileName = filePath.split("/").pop() || "";
+  const docId = fileName.replace(/\.(wav|mp3)$/, "");
 
-  console.log("File Name:", fileName);
+  if (!docId) return;
 
-  // ============================
-  // SAFE docId extraction
-  // ============================
-  const parts = fileName.split("/");
-  const file = parts[parts.length - 1];
-  const docId = file.split(".")[0];
-
-  console.log("Extracted docId:", docId);
-
-  const db = getFirestore();
+  const ref = db.collection("speeches").doc(docId);
 
   try {
-    // ============================
-    // BUILD GCS URI (FIXED)
-    // ============================
-    const bucket = object.bucket;
+    const docSnap = await ref.get();
+    if (!docSnap.exists) return;
 
-    if (!bucket) {
-      console.log("No bucket found");
+    // ----------------------------------
+    // 3. TRANSCRIPT (SAFE FALLBACK)
+    // ----------------------------------
+    let transcript = object.metadata?.transcript || "";
+
+    if (!transcript || transcript.trim().length < 10) {
+      await ref.update({
+        status: "failed",
+        error: "Transcript missing or too short",
+        updatedAt: new Date(),
+      });
       return;
     }
 
-    const gcsUri = `gs://${bucket}/${fileName}`; // ✅ FIXED
+    // ----------------------------------
+    // 4. CLEAN TRANSCRIPT
+    // ----------------------------------
+    const cleanTranscript = transcript
+      .toLowerCase()
+      .replace(/[^\w\s]/g, "")
+      .trim();
 
-    console.log("GCS URI:", gcsUri);
+    const wordsArray = cleanTranscript.split(/\s+/);
+    const words = wordsArray.length;
 
-    // ============================
-    // SPEECH-TO-TEXT REQUEST
-    // ============================
-    const [operation] = await speechClient.longRunningRecognize({
-      audio: {
-        uri: gcsUri,
-      },
-      config: {
-        encoding: "MP3",
-        languageCode: "en-US",
-      },
-    });
+    // ----------------------------------
+    // 5. AUDIO DURATION (SAFE DEFAULT)
+    // ----------------------------------
+    const audioDuration = Number(object.metadata?.duration) || 60;
+    const durationMinutes = Math.max(audioDuration / 60, 0.5);
+    const wpm = Math.round(words / durationMinutes);
 
-    console.log("Processing audio...");
+    // ----------------------------------
+    // 6. FILLER WORD DETECTION (FIXED)
+    // ----------------------------------
+    const fillerWordsList = ["you know", "actually", "basically", "um", "uh", "like", "so"];
+    let fillerCount = 0;
 
-    const [response] = await operation.promise();
-
-    // ============================
-    // EXTRACT TRANSCRIPT (SAFE)
-    // ============================
-    const transcript =
-      response.results
-        ?.map((result: any) => result.alternatives?.[0]?.transcript || "")
-        .join(" ")
-        .trim() || "";
-
-    console.log("Transcript:", transcript);
-
-    // 🔥 ANALYTICS
-    const words = transcript ? transcript.split(/\s+/).length : 0;
-
-    const fillerMatches =
-      transcript.match(/\b(um|uh|like|you know)\b/gi) || [];
-
-    const fillerWords = fillerMatches.length;
-
-    const speedWPM = words;
-    const speechScore = Math.max(0, 100 - fillerWords * 2);
-
-    console.log("Analytics:", {
-      words,
-      fillerWords,
-      speedWPM,
-      speechScore,
-    });
-
-    // 🔍 FIND DOCUMENT
-    const speechDocs = await admin
-      .firestore()
-      .collection("speeches")
-      .get();
-
-    for (const doc of speechDocs.docs) {
-      const data = doc.data();
-
-      if (data.audioUrl && data.audioUrl.includes(filePath)) {
-        console.log("Updating document:", doc.id);
-
-        await doc.ref.update({
-          transcript,
-          words,
-          fillerWords,
-          speedWPM,
-          speechScore,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          status: "completed",
-        });
-      }
+    for (const word of fillerWordsList) {
+      const regex = new RegExp(`\\b${word}\\b`, "gi"); // FIXED
+      const matches = cleanTranscript.match(regex);
+      if (matches) fillerCount += matches.length;
     }
 
-    console.log("Processing completed");
+    // ----------------------------------
+    // 7. SCORING LOGIC
+    // ----------------------------------
+    const clarityScore = Math.max(0, 100 - fillerCount * 2);
 
-  } catch (error) {
-    console.error("Error processing speech:", error);
-    // ============================
-    // SIMPLE ANALYTICS
-    // ============================
-    const words = transcript.split(/\s+/).filter(Boolean);
-    const wordCount = words.length;
+    let speedScore = 70;
+    if (wpm >= 120 && wpm <= 160) speedScore = 100;
+    else if ((wpm >= 100 && wpm < 120) || (wpm > 160 && wpm <= 180)) speedScore = 85;
 
-    let score = 0;
+    const overallScore = Math.round(clarityScore * 0.6 + speedScore * 0.4);
 
-    if (wordCount > 0) {
-      score = Math.min(100, Math.round((wordCount / 120) * 100));
+    // ----------------------------------
+    // 8. AI FEEDBACK ENGINE
+    // ----------------------------------
+    const strengths: string[] = [];
+    const weaknesses: string[] = [];
+    const suggestions: string[] = [];
+
+    if (clarityScore > 80) {
+      strengths.push("Clear speech delivery");
+    } else {
+      weaknesses.push("Too many filler words");
+      suggestions.push("Reduce filler words like 'um', 'uh'");
     }
 
-    console.log("Word Count:", wordCount);
-    console.log("Score:", score);
+    if (wpm >= 120 && wpm <= 160) {
+      strengths.push("Good speaking pace");
+    } else {
+      weaknesses.push("Speaking speed needs improvement");
+      suggestions.push("Maintain 120–160 words per minute");
+    }
 
-    // ============================
-    // UPDATE FIRESTORE
-    // ============================
-    await db.collection("speeches").doc(docId).update({
+    if (words < 50) {
+      weaknesses.push("Speech content is too short");
+      suggestions.push("Expand with more supporting ideas");
+    }
+
+    // ----------------------------------
+    // 9. SIMPLE FEEDBACK STRING (FOR UI)
+    // ----------------------------------
+    const feedbackText = [...strengths, ...suggestions].join(". ");
+
+    // ----------------------------------
+    // 10. FINAL FIRESTORE UPDATE (PHASE 2 COMPATIBLE)
+    // ----------------------------------
+    await ref.update({
       transcript,
-      wordCount,
-      score,
+
+      metrics: {
+        words,
+        wpm,
+        fillerWords: fillerCount,
+        clarityScore,
+        speedScore,
+      },
+
+      overallScore,
+
+      feedback: feedbackText, // Phase 2 UI uses this
+      aiFeedback: {
+        strengths,
+        weaknesses,
+        suggestions,
+      },
+
+      scoringVersion: "v2-phase3",
       status: "completed",
       updatedAt: new Date(),
     });
 
-    console.log("Firestore updated successfully");
+    console.log(`Successfully updated doc: ${docId}`);
 
   } catch (error: any) {
-    console.error("Speech processing failed:", error);
+    console.error("Processing error:", error);
 
-    // ============================
-    // FAIL-SAFE UPDATE
-    // ============================
-    try {
-      await db.collection("speeches").doc(docId).update({
-        status: "failed",
-        error: error?.message || "Unknown error",
-      });
-    } catch (updateError) {
-      console.error("Firestore fail-safe update failed:", updateError);
-    }
+    await ref.update({
+      status: "failed",
+      error: error.message,
+      updatedAt: new Date(),
+    });
   }
 });
