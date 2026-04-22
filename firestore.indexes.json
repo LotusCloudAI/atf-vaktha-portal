@@ -1,0 +1,12 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "speeches",
+      "fields": [
+        { "fieldPath": "userUid", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
