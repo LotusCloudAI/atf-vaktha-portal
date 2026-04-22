@@ -2,16 +2,30 @@
 
 export default function AICoachPanel({ data }: any) {
   if (!data) {
-    return <p className="text-gray-400">AI feedback not ready.</p>;
+    return (
+      <p className="text-gray-400">
+        AI feedback is being generated. Please check again shortly.
+      </p>
+    );
   }
+
+  // ✅ HANDLE BACKEND FIELD MISMATCH
+  const strengths = Array.isArray(data.strengths) ? data.strengths : [];
+
+  const improvements = [
+    ...(Array.isArray(data.improvements) ? data.improvements : []),
+    ...(Array.isArray(data.suggestions) ? data.suggestions : []),
+    ...(Array.isArray(data.weaknesses) ? data.weaknesses : [])
+  ];
 
   return (
     <div className="bg-white p-5 rounded shadow">
 
       <h2 className="font-bold mb-3">AI Coach</h2>
 
+      {/* SUMMARY */}
       <p className="mb-4 text-gray-700">
-        {data.summary || "No summary available"}
+        {data?.summary || "AI feedback is being generated. Please check again shortly."}
       </p>
 
       <div className="grid md:grid-cols-2 gap-4">
@@ -20,8 +34,8 @@ export default function AICoachPanel({ data }: any) {
         <div>
           <h3 className="font-semibold">Strengths</h3>
           <ul className="list-disc pl-5">
-            {Array.isArray(data.strengths) && data.strengths.length > 0 ? (
-              data.strengths.map((s: string, i: number) => (
+            {strengths.length > 0 ? (
+              strengths.map((s: string, i: number) => (
                 <li key={i}>{s}</li>
               ))
             ) : (
@@ -34,8 +48,8 @@ export default function AICoachPanel({ data }: any) {
         <div>
           <h3 className="font-semibold">Improvements</h3>
           <ul className="list-disc pl-5">
-            {Array.isArray(data.improvements) && data.improvements.length > 0 ? (
-              data.improvements.map((s: string, i: number) => (
+            {improvements.length > 0 ? (
+              improvements.map((s: string, i: number) => (
                 <li key={i}>{s}</li>
               ))
             ) : (
@@ -48,9 +62,9 @@ export default function AICoachPanel({ data }: any) {
 
       {/* INSIGHTS */}
       <div className="mt-4 text-sm text-gray-600 space-y-1">
-        <p>{data.fillerInsights || "No filler insights"}</p>
-        <p>{data.pacingInsights || "No pacing insights"}</p>
-        <p>{data.clarityInsights || "No clarity insights"}</p>
+        <p>{data.fillerInsights || "Filler analysis in progress..."}</p>
+        <p>{data.pacingInsights || "Pacing analysis in progress..."}</p>
+        <p>{data.clarityInsights || "Clarity analysis in progress..."}</p>
       </div>
 
       {/* SCORE BARS */}
@@ -66,7 +80,8 @@ export default function AICoachPanel({ data }: any) {
 }
 
 function ScoreBar({ label, value }: any) {
-  const safeValue = value || 0;
+  // ✅ HIDE BAR IF VALUE NOT AVAILABLE
+  if (typeof value !== "number") return null;
 
   return (
     <div>
@@ -74,7 +89,7 @@ function ScoreBar({ label, value }: any) {
       <div className="w-full bg-gray-200 h-2 rounded">
         <div
           className="bg-green-500 h-2 rounded"
-          style={{ width: `${safeValue}%` }}
+          style={{ width: `${value}%` }}   // ✅ FIXED BUG
         />
       </div>
     </div>

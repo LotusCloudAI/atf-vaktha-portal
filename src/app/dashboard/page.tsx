@@ -14,7 +14,7 @@ import {
 import SpeechCard from "../../components/dashboard/SpeechCard";
 import ProgressPanel from "../../components/dashboard/ProgressPanel";
 import RecommendationsPanel from "../../components/dashboard/RecommendationsPanel";
-
+<h1>Phase 6 active</h1>
 export default function DashboardPage() {
   const [speeches, setSpeeches] = useState<any[]>([]);
   const [progress, setProgress] = useState<any>(null);
