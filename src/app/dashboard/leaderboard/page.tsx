@@ -35,7 +35,7 @@ export default function LeaderboardPage() {
 
         if (q) {
             const snapshot = await getDocs(q);
-            setSpeakers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            setSpeakers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as Record<string, unknown> })));
         }
       } catch (error) {
         // Handled silently per Section 8, but logging during dev is helpful for missing index errors
