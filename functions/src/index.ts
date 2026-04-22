@@ -5,6 +5,11 @@ import * as admin from "firebase-admin";
 import { SpeechClient, protos } from "@google-cloud/speech";
 import * as path from "path";
 
+// 1. PHASE 7 EXPORTS (CRITICAL) 
+export * from "./triggers/updateTrending";
+export * from "./jobs/updateUserStats";
+export * from "./jobs/updateLeaderboards";
+
 // Initialize Firebase Admin once
 if (admin.apps.length === 0) {
   admin.initializeApp();
@@ -26,18 +31,14 @@ const FILLER_WORDS_LIST = ["um", "uh", "like", "you know", "actually", "basicall
  * PHASE 3 ENHANCED SCORING ENGINE
  */
 function calculateEnhancedMetrics(wordCount: number, fillerCount: number, wpm: number) {
-  // Clarity Score: Starts at 100, drops 2 points per filler word
   const clarityScore = Math.max(0, 100 - fillerCount * 2);
 
-  // Speed Score: Ideal pace is 120-160 WPM
   let speedScore = 70;
   if (wpm >= 120 && wpm <= 160) speedScore = 100;
   else if ((wpm >= 100 && wpm < 120) || (wpm > 160 && wpm <= 180)) speedScore = 85;
 
-  // Overall Score: Weighted average (60% Clarity, 40% Speed)
   const overallScore = Math.round(clarityScore * 0.6 + speedScore * 0.4);
 
-  // AI Feedback Engine
   const strengths: string[] = [];
   const weaknesses: string[] = [];
   const suggestions: string[] = [];
@@ -82,7 +83,6 @@ export const processSpeechStorage = onObjectFinalized(async (event: StorageEvent
     const fileName = path.basename(filePath);
     const ext = path.extname(fileName).toLowerCase();
     
-    // docId extraction: speeches/abc.wav -> abc
     const docId = fileName.replace(ext, "");
 
     if (!SUPPORTED_AUDIO.includes(ext)) {
@@ -93,7 +93,6 @@ export const processSpeechStorage = onObjectFinalized(async (event: StorageEvent
     const audioUri = `gs://${bucketName}/${filePath}`;
     logger.log(`Processing: ${audioUri}`);
 
-    // Encoding Logic
     let encoding;
     if (ext === ".mp3") {
       encoding = protos.google.cloud.speech.v1.RecognitionConfig.AudioEncoding.MP3;
@@ -126,36 +125,29 @@ export const processSpeechStorage = onObjectFinalized(async (event: StorageEvent
       return;
     }
 
-    // Phase 3 Metrics
     const wordsArray = transcript.toLowerCase().split(/\s+/).filter(Boolean);
     const wordCount = wordsArray.length;
     const fillerCount = wordsArray.filter(w => FILLER_WORDS_LIST.includes(w)).length;
 
-    // Duration extraction: use metadata if available, else default to 60s
     const audioDuration = Number(event.data.metadata?.duration) || 60;
     const durationMinutes = Math.max(audioDuration / 60, 0.5);
     const speedWPM = Math.round(wordCount / durationMinutes);
 
-    // Calculate Enhanced Scores
     const results = calculateEnhancedMetrics(wordCount, fillerCount, speedWPM);
 
     const speechRef = db.collection("speeches").doc(docId);
     const speechDoc = await speechRef.get();
     const userUid = speechDoc.exists ? speechDoc.data()?.userUid : null;
 
-    // FIRESTORE FINAL PHASE 3 SCHEMA
     await speechRef.set(
       {
         transcript,
-        
-        // TOP-LEVEL FIELDS FOR PORTAL UI
         words: wordCount,
         wpm: speedWPM,
         speedWPM: speedWPM, 
         fillerWords: fillerCount,
         score: results.overallScore,
 
-        // Nested metrics
         metrics: {
           words: wordCount,
           wpm: speedWPM,
