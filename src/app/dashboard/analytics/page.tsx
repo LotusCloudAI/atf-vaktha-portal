@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import { auth, db } from "../../../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, getDocs } from "firebase/firestore";
+
 import AnalyticsCard from "../../../components/dashboard/AnalyticsCard";
+import AICoachPanel from "../../../components/dashboard/AICoachPanel";
+import SectionAnalysis from "../../../components/dashboard/SectionAnalysis";
+import ScoreBars from "../../../components/dashboard/ScoreBars";
 
 interface Speech {
   id: string;
@@ -19,6 +23,12 @@ interface Speech {
   fillerWords?: number;
   vocabularyScore?: number;
   transcript?: string;
+
+  // AI fields (safe optional)
+  summary?: string;
+  strengths?: string[];
+  improvements?: string[];
+  suggestions?: string[];
 }
 
 export default function AnalyticsPage() {
@@ -44,7 +54,6 @@ export default function AnalyticsPage() {
         const data: Speech[] = snapshot.docs.map((doc) => {
           const d = doc.data();
 
-          // 🔥 FINAL SCORE FIX (CRITICAL)
           const finalScore = Number(
             d.score ?? d.speechScore ?? d.totalScore ?? 0
           );
@@ -58,10 +67,16 @@ export default function AnalyticsPage() {
 
             score: finalScore,
             words: d.words || 0,
-            speedWPM: d.speedWPM || 0,
+            speedWPM: d.speedWPM || d.wpm || 0,
             fillerWords: d.fillerWords || 0,
             vocabularyScore: d.vocabularyScore || 0,
             transcript: d.transcript || "",
+
+            // AI fields (safe mapping)
+            summary: d.summary || "",
+            strengths: d.strengths || [],
+            improvements: d.improvements || d.weaknesses || [],
+            suggestions: d.suggestions || [],
           };
         });
 
@@ -93,10 +108,7 @@ export default function AnalyticsPage() {
         </h1>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-          <AnalyticsCard
-            title="Total Speeches"
-            value={speeches.length}
-          />
+          <AnalyticsCard title="Total Speeches" value={speeches.length} />
         </div>
 
         {speeches.length === 0 ? (
@@ -106,11 +118,12 @@ export default function AnalyticsPage() {
             </p>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="space-y-6">
+
             {speeches.map((speech) => (
               <div
                 key={speech.id}
-                className="bg-white p-6 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition"
+                className="bg-white p-6 rounded-xl shadow-md border border-gray-200"
               >
                 <h2 className="text-lg font-semibold text-gray-800 mb-2">
                   {speech.title}
@@ -120,7 +133,8 @@ export default function AnalyticsPage() {
                   ID: {speech.id.slice(0, 6)}
                 </p>
 
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                {/* METRICS */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
                   <div>
                     <p className="text-gray-500">Words</p>
                     <p className="font-semibold">{speech.words}</p>
@@ -145,8 +159,21 @@ export default function AnalyticsPage() {
                     </p>
                   </div>
                 </div>
+
+                {/* ✅ AI COMPONENTS — FINAL PLACEMENT */}
+                <div className="mt-4 space-y-4">
+
+                  <AICoachPanel data={speech} />
+
+                  <SectionAnalysis data={speech} />
+
+                  <ScoreBars data={speech} />
+
+                </div>
+
               </div>
             ))}
+
           </div>
         )}
       </div>
