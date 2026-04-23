@@ -9,6 +9,7 @@ import AnalyticsCard from "../../../components/dashboard/AnalyticsCard";
 import AICoachPanel from "../../../components/dashboard/AICoachPanel";
 import SectionAnalysis from "../../../components/dashboard/SectionAnalysis";
 import ScoreBars from "../../../components/dashboard/ScoreBars";
+import TranscriptViewer from "../../../components/dashboard/TranscriptViewer";
 
 interface Speech {
   id: string;
@@ -17,18 +18,22 @@ interface Speech {
   audioUrl?: string;
   createdAt?: any;
 
-  score?: number;
-  words?: number;
-  speedWPM?: number;
-  fillerWords?: number;
-  vocabularyScore?: number;
+  overallScore?: number;
   transcript?: string;
 
-  // AI fields (safe optional)
-  summary?: string;
-  strengths?: string[];
-  improvements?: string[];
-  suggestions?: string[];
+  metrics?: {
+    words?: number;
+    wpm?: number;
+    fillerWords?: number;
+    clarityScore?: number;
+  };
+
+  // ✅ Phase 8 AI structure
+  aiFeedback?: {
+    strengths?: string[];
+    suggestions?: string[];
+    weaknesses?: string[];
+  };
 }
 
 export default function AnalyticsPage() {
@@ -54,10 +59,6 @@ export default function AnalyticsPage() {
         const data: Speech[] = snapshot.docs.map((doc) => {
           const d = doc.data();
 
-          const finalScore = Number(
-            d.score ?? d.speechScore ?? d.totalScore ?? 0
-          );
-
           return {
             id: doc.id,
             title: d.title || "Untitled Speech",
@@ -65,18 +66,17 @@ export default function AnalyticsPage() {
             audioUrl: d.audioUrl || "",
             createdAt: d.createdAt || null,
 
-            score: finalScore,
-            words: d.words || 0,
-            speedWPM: d.speedWPM || d.wpm || 0,
-            fillerWords: d.fillerWords || 0,
-            vocabularyScore: d.vocabularyScore || 0,
+            overallScore: d.overallScore || 0,
             transcript: d.transcript || "",
 
-            // AI fields (safe mapping)
-            summary: d.summary || "",
-            strengths: d.strengths || [],
-            improvements: d.improvements || d.weaknesses || [],
-            suggestions: d.suggestions || [],
+            metrics: d.metrics || {},
+
+            // ✅ Correct Phase 8 mapping
+            aiFeedback: d.aiFeedback || {
+              strengths: [],
+              suggestions: [],
+              weaknesses: [],
+            },
           };
         });
 
@@ -133,40 +133,52 @@ export default function AnalyticsPage() {
                   ID: {speech.id.slice(0, 6)}
                 </p>
 
-                {/* METRICS */}
+                {/* ✅ METRICS */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
                   <div>
                     <p className="text-gray-500">Words</p>
-                    <p className="font-semibold">{speech.words}</p>
+                    <p className="font-semibold">
+                      {speech.metrics?.words || 0}
+                    </p>
                   </div>
 
                   <div>
                     <p className="text-gray-500">WPM</p>
-                    <p className="font-semibold">{speech.speedWPM}</p>
+                    <p className="font-semibold">
+                      {speech.metrics?.wpm || 0}
+                    </p>
                   </div>
 
                   <div>
                     <p className="text-gray-500">Filler Words</p>
-                    <p className="font-semibold">{speech.fillerWords}</p>
+                    <p className="font-semibold">
+                      {speech.metrics?.fillerWords || 0}
+                    </p>
                   </div>
 
                   <div>
                     <p className="text-gray-500">Score</p>
                     <p className="font-semibold text-green-600">
-                      {speech.score && speech.score > 0
-                        ? speech.score
+                      {speech.overallScore && speech.overallScore > 0
+                        ? speech.overallScore
                         : "-"}
                     </p>
                   </div>
                 </div>
 
-                {/* ✅ AI COMPONENTS — FINAL PLACEMENT */}
+                {/* ✅ AI COMPONENTS — FINAL ORDER */}
                 <div className="mt-4 space-y-4">
 
+                  {/* 1. AI Coach */}
                   <AICoachPanel data={speech} />
 
+                  {/* 2. Transcript (NEW) */}
+                  <TranscriptViewer transcript={speech.transcript} />
+
+                  {/* 3. Section Analysis */}
                   <SectionAnalysis data={speech} />
 
+                  {/* 4. Score Bars */}
                   <ScoreBars data={speech} />
 
                 </div>
