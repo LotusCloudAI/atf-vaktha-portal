@@ -1,20 +1,24 @@
 import "./globals.css";
-import React from "react";
-import type { Metadata } from "next";
+import { AppProvider } from "../lib/context/AppContext";
+import Header from "../components/layout/Header";
+import Footer from "../components/layout/Footer";
 
-export const metadata: Metadata = {
-  title: "ATF Vaktha Portal",
-  description: "Leadership • Communication • Confidence",
-};
-
-type RootLayoutProps = {
+export default function RootLayout({
+  children,
+}: {
   children: React.ReactNode;
-};
-
-export default function RootLayout({ children }: RootLayoutProps) {
+}) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <AppProvider>
+          <Header />
+          <main className="min-h-screen">
+            {children}
+          </main>
+          <Footer />
+        </AppProvider>
+      </body>
     </html>
   );
 }
