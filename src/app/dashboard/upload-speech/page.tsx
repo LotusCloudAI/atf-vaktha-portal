@@ -22,21 +22,18 @@ export default function UploadSpeech() {
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!audioFile || !title) {
+    if (!audioFile || !title.trim()) {
       alert("Please provide title and audio file");
       return;
     }
 
-    // ✅ WAV VALIDATION (CRITICAL FIX)
+    // ✅ VALIDATE FILE TYPE
     const fileName = audioFile.name.toLowerCase();
 
-      if (
-        !fileName.endsWith(".wav") &&
-        !fileName.endsWith(".mp3")
-      ) {
-        alert("Please upload WAV or MP3 file");
-        return;
-      }
+    if (!fileName.endsWith(".wav") && !fileName.endsWith(".mp3")) {
+      alert("Only WAV or MP3 files are allowed");
+      return;
+    }
 
     setLoading(true);
 
@@ -49,33 +46,41 @@ export default function UploadSpeech() {
         return;
       }
 
-      // ✅ STEP 1: Create Firestore doc FIRST
+      // ✅ STEP 1: CREATE DOC FIRST (CRITICAL FIX)
       const speechRef = doc(collection(db, "speeches"));
       const docId = speechRef.id;
 
-      // ✅ STEP 2: Upload audio using SAME docId
-      const fileExt = audioFile.name.split(".").pop();
+      // ✅ STEP 2: DETERMINE FILE EXTENSION
+      const fileExt = fileName.split(".").pop() || "wav";
+
+      // ✅ STEP 3: STORAGE PATH (FIXED TEMPLATE STRING)
       const audioRef = ref(storage, `speeches/${docId}.${fileExt}`);
 
+      // ✅ STEP 4: UPLOAD FILE
       await uploadBytes(audioRef, audioFile);
 
-      // ✅ STEP 3: Get URL
+      // ✅ STEP 5: GET DOWNLOAD URL
       const audioUrl = await getDownloadURL(audioRef);
 
-      // ✅ STEP 4: Save Firestore (ONLY BASIC DATA)
+      // ✅ STEP 6: SAVE FIRESTORE (MATCH FUNCTION EXPECTATION)
       await setDoc(speechRef, {
         title: title.trim(),
         audioUrl,
         userUid: user.uid,
         createdAt: serverTimestamp(),
 
-        // ⚠️ DO NOT ADD ANALYTICS HERE
+        // 🔥 IMPORTANT FOR FUNCTION PIPELINE
         status: "processing",
+
+        // OPTIONAL SAFE FIELDS (avoid undefined)
+        metrics: null,
+        transcript: "",
+        overallScore: null,
       });
 
       alert("Speech uploaded successfully!");
 
-      // reset
+      // ✅ RESET FORM
       setTitle("");
       setAudioFile(null);
     } catch (error) {
@@ -113,7 +118,7 @@ export default function UploadSpeech() {
           </label>
           <input
             type="file"
-            accept=".wav, .mp3, audio/*"
+            accept=".wav,.mp3,audio/*"
             onChange={(e) =>
               setAudioFile(e.target.files?.[0] || null)
             }
@@ -125,7 +130,7 @@ export default function UploadSpeech() {
         <button
           type="submit"
           disabled={loading}
-          className="bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700"
+          className="bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700 transition"
         >
           {loading ? "Uploading..." : "Upload Speech"}
         </button>
