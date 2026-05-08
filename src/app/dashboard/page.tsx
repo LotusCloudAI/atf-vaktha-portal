@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { db, auth } from "../../lib/firebase";
+import SubscribeButton from "../../components/billing/SubscribeButton";
+
 import {
   collection,
   query,
@@ -38,7 +40,6 @@ export default function DashboardPage() {
 
       setUserLoaded(true);
 
-      // ✅ SPEECHES LISTENER (FIXED + ORDERED)
       const q = query(
         collection(db, "speeches"),
         where("userUid", "==", user.uid),
@@ -53,26 +54,20 @@ export default function DashboardPage() {
 
             return {
               id: doc.id,
-
-              // ✅ SAFE DEFAULTS (CRITICAL)
               title: data.title || "Untitled Speech",
               audioUrl: data.audioUrl || null,
               status: data.status || "processing",
               transcript: data.transcript || null,
 
-              // ✅ METRICS (FLAT STRUCTURE)
               words: data.words ?? 0,
               fillerWords: data.fillerWords ?? 0,
               speedWPM: data.speedWPM ?? 0,
 
-              // ✅ SCORES
               totalScore: data.totalScore ?? 0,
               clarityScore: data.clarityScore ?? 0,
               confidenceScore: data.confidenceScore ?? 0,
 
-              // ✅ FEEDBACK
               feedback: data.feedback || null,
-
               createdAt: data.createdAt || null,
               error: data.error || null,
             };
@@ -87,7 +82,6 @@ export default function DashboardPage() {
         }
       );
 
-      // ✅ PROGRESS
       unsubProgress = onSnapshot(
         doc(db, "userProgress", user.uid),
         (docSnap) => {
@@ -95,7 +89,6 @@ export default function DashboardPage() {
         }
       );
 
-      // ✅ RECOMMENDATIONS
       unsubRecs = onSnapshot(
         doc(db, "userRecommendations", user.uid),
         (docSnap) => {
@@ -104,7 +97,6 @@ export default function DashboardPage() {
       );
     });
 
-    // ✅ CLEANUP (IMPORTANT)
     return () => {
       unsubscribeAuth();
       unsubSpeeches?.();
@@ -113,7 +105,7 @@ export default function DashboardPage() {
     };
   }, []);
 
-  // ❌ NOT LOGGED IN
+  // NOT LOGGED IN
   if (!userLoaded && !loading) {
     return (
       <div className="p-6 text-center">
@@ -124,7 +116,7 @@ export default function DashboardPage() {
     );
   }
 
-  // ⏳ LOADING STATE
+  // LOADING
   if (loading) {
     return (
       <div className="p-6 max-w-5xl mx-auto">
@@ -143,17 +135,17 @@ export default function DashboardPage() {
         My Speaking Dashboard
       </h1>
 
-      {/* ✅ PROGRESS */}
+      {/* PROGRESS */}
       <section className="mb-8">
         <ProgressPanel data={progress} />
       </section>
 
-      {/* ✅ RECOMMENDATIONS */}
+      {/* RECOMMENDATIONS */}
       <section className="mb-8">
         <RecommendationsPanel data={recommendations} />
       </section>
 
-      {/* ✅ SPEECHES */}
+      {/* SPEECHES */}
       <div className="mt-10">
         <h2 className="text-xl font-semibold mb-4">
           Recent Speeches
@@ -172,6 +164,31 @@ export default function DashboardPage() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* STRIPE SECTION */}
+      <div className="mt-10 border-t pt-6">
+        <h2 className="text-lg font-bold mb-4">
+          Upgrade Your Plan
+        </h2>
+
+        <div className="flex gap-4">
+
+          {/* PRO PLAN */}
+          <div className="border p-4 rounded-md">
+            <h3 className="font-semibold">Pro Plan</h3>
+            <p className="text-sm mb-2">$19/month</p>
+            <SubscribeButton priceId="price_1TUVqaCf8UadXOBqcGll7Ipz" />
+          </div>
+
+          {/* ELITE PLAN */}
+          <div className="border p-4 rounded-md">
+            <h3 className="font-semibold">Elite Plan</h3>
+            <p className="text-sm mb-2">$49/month</p>
+            <SubscribeButton priceId="price_1TUVtcCf8UadXOBqWTRIX9fD" />
+          </div>
+
+        </div>
       </div>
     </main>
   );

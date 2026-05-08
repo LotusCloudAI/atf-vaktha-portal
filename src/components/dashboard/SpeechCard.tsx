@@ -62,7 +62,7 @@ export default function SpeechCard({ speech }: any) {
         </div>
 
         <div>
-          <p className="text-xs uppercase text-gray-500">Fillers</p>
+          <p className="text-xs uppercase text-gray-500">Filler Words</p>
           <p className="font-semibold text-gray-700">
             {speech.fillerWords ?? "-"}
           </p>

@@ -9,13 +9,15 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@stripe/stripe-js": "^9.3.1",
+    "@stripe/stripe-js": "^9.4.0",
     "clsx": "^2.1.1",
     "firebase": "^12.10.0",
+    "firebase-admin": "^13.9.0",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "recharts": "^3.8.0"
+    "recharts": "^3.8.0",
+    "stripe": "^22.1.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",

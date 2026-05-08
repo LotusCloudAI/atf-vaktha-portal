@@ -148,7 +148,11 @@ export const processSpeechStorage = onObjectFinalized(async (event: StorageEvent
     const wordCount = wordsArray.length;
     const uniqueWords = new Set(wordsArray);
 
-    const fillerWordCount = wordsArray.filter((w) => FILLER_WORDS_LIST.includes(w)).length;
+    const fillerWordCount = wordsArray.filter(w => {
+    const cleanWord = w.replace(/[^\w\s]/g, "").toLowerCase();
+    return FILLER_WORDS_LIST.some(f => cleanWord.includes(f));
+    }).length;
+
     const fillerRate = wordCount > 0 ? fillerWordCount / wordCount : 0;
     const vocabularyRatio = wordCount > 0 ? uniqueWords.size / wordCount : 0;
 
