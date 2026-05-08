@@ -1,16 +1,21 @@
 import React from "react";
-import Header from "@/components/website/Header";
-import Footer from "@/components/website/Footer";
+import Header from "@/components/layout/Header";
+import Footer from "@/components/layout/Footer";
 
 type LayoutProps = {
   children: React.ReactNode;
 };
 
-export default function Layout({ children }: LayoutProps) {
+export default function WebsiteLayout({ children }: LayoutProps) {
   return (
     <>
+      {/* Website Header */}
       <Header />
-      {children}
+
+      {/* Page Content */}
+      <main className="min-h-screen">{children}</main>
+
+      {/* Website Footer */}
       <Footer />
     </>
   );

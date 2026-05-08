@@ -1,5 +1,7 @@
 {
   "projects": {
     "default": "atf-vaktha"
-  }
+  },
+  "targets": {},
+  "etags": {}
 }

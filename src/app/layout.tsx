@@ -7,14 +7,16 @@ export const metadata: Metadata = {
   description: "Leadership • Communication • Confidence",
 };
 
-type RootLayoutProps = {
+export default function RootLayout({
+  children,
+}: {
   children: React.ReactNode;
-};
-
-export default function RootLayout({ children }: RootLayoutProps) {
+}) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className="min-h-screen bg-gray-50">
+        {children}
+      </body>
     </html>
   );
 }
