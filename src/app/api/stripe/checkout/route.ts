@@ -4,7 +4,11 @@ import Stripe from "stripe";
 // ==========================================
 // STRIPE INIT
 // ==========================================
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error("❌ STRIPE_SECRET_KEY is missing");
+}
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2023-10-16",
 });
 
@@ -15,32 +19,32 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    // ======================================
-    // 🔹 INPUTS (FROM FRONTEND)
-    // ======================================
     const { priceId, userId } = body;
 
-    console.log("📥 Checkout request received");
-    console.log("👤 userId:", userId);
-    console.log("💰 priceId:", priceId);
+    console.log("📥 Checkout request:", { userId, priceId });
 
     // ======================================
-    // 🔴 VALIDATION
+    // VALIDATION
     // ======================================
     if (!priceId || !userId) {
-      console.error("❌ Missing priceId or userId");
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Missing priceId or userId" },
         { status: 400 }
       );
     }
 
     // ======================================
-    // 🔹 CREATE STRIPE SESSION
+    // BASE URL
+    // ======================================
+    const baseUrl =
+      process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+
+    // ======================================
+    // CREATE SESSION
     // ======================================
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
       mode: "subscription",
+      payment_method_types: ["card"],
 
       line_items: [
         {
@@ -49,28 +53,26 @@ export async function POST(req: Request) {
         },
       ],
 
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard?success=true`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard?cancel=true`,
+      // ✅ FIXED (IMPORTANT)
+      success_url: `${baseUrl}/dashboard?success=true`,
+      cancel_url: `${baseUrl}/dashboard?cancel=true`,
 
-      // 🔥 CRITICAL FIX (THIS WAS MISSING)
       metadata: {
-        userId: userId,
-        priceId: priceId,
+        userId,
+        priceId,
       },
+
+      allow_promotion_codes: true,
     });
 
-    console.log("✅ Stripe session created:", session.id);
+    console.log("✅ Session created:", session.id);
 
-    // ======================================
-    // RESPONSE
-    // ======================================
-    return NextResponse.json({
-      url: session.url,
-    });
-  } catch (error) {
+    return NextResponse.json({ url: session.url });
+  } catch (error: any) {
     console.error("❌ Checkout error:", error);
+
     return NextResponse.json(
-      { error: "Checkout failed" },
+      { error: error.message || "Checkout failed" },
       { status: 500 }
     );
   }
