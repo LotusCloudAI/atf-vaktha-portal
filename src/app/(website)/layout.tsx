@@ -15,9 +15,16 @@ export default function WebsiteLayout({ children }: LayoutProps) {
 
       {/* ================= MAIN ================= */}
       <main className="flex-1 w-full">
-        <div className="max-w-7xl mx-auto px-6 py-10">
+        
+        {/* 
+          IMPORTANT DESIGN RULE:
+          - Keep container here for consistent alignment
+          - All pages inherit spacing automatically
+        */}
+        <div className="max-w-7xl mx-auto px-6 py-12">
           {children}
         </div>
+
       </main>
 
       {/* ================= FOOTER ================= */}
