@@ -11,7 +11,7 @@
   "dependencies": {
     "@stripe/stripe-js": "^9.4.0",
     "clsx": "^2.1.1",
-    "firebase": "^12.10.0",
+    "firebase": "^12.13.0",
     "firebase-admin": "^13.9.0",
     "next": "16.1.6",
     "react": "19.2.3",
